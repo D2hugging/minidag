@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Debug)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build (Debug)
+        run: cmake --build build
+
+      - name: Test (Debug)
+        run: ./build/bin/minidag_test
+
+      - name: Configure (Release)
+        run: cmake -B build-release -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (Release)
+        run: cmake --build build-release
+
+      - name: Test (Release)
+        run: ./build-release/bin/minidag_test

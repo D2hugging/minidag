@@ -1,0 +1,108 @@
+{
+  "thread_pool_size": 4,
+  "dags": {
+    "search": {
+      "nodes": [
+        {
+          "id": "parse_node",
+          "op_type": "QueryParseOp",
+          "dependencies": []
+        },
+        {
+          "id": "vec_node",
+          "op_type": "VectorRecallOp",
+          "dependencies": ["parse_node"],
+          "optional": true,
+          "timeout_ms": 200,
+          "params": {
+            "top_k": 20,
+            "timeout_ms": 150,
+            "model_name": "advanced_vec_model",
+            "enable_filter": true
+          }
+        },
+        {
+          "id": "idx_node",
+          "op_type": "IndexRecallOp",
+          "dependencies": ["parse_node"],
+          "optional": true,
+          "timeout_ms": 100
+        },
+        {
+          "id": "hot_node",
+          "op_type": "HotRecallOp",
+          "dependencies": ["parse_node"],
+          "optional": true,
+          "timeout_ms": 100
+        },
+        {
+          "id": "merge_node",
+          "op_type": "MergeOp",
+          "dependencies": ["vec_node", "idx_node", "hot_node"]
+        },
+        {
+          "id": "deep_rank_node",
+          "op_type": "DeepRankOp",
+          "dependencies": ["merge_node"],
+          "params": {
+            "model_path": "/models/rank_model.bin",
+            "threshold": {
+              "ctr": 0.1,
+              "cvr": 0.05
+            },
+            "features": [
+              {"name": "user_age", "type": "int"},
+              {"name": "item_click_rate", "type": "float"}
+            ]
+          }
+        }
+      ]
+    },
+    "recommend": {
+      "nodes": [
+        {
+          "id": "parse_node",
+          "op_type": "QueryParseOp",
+          "dependencies": []
+        },
+        {
+          "id": "vec_node",
+          "op_type": "VectorRecallOp",
+          "dependencies": ["parse_node"],
+          "optional": true,
+          "timeout_ms": 200,
+          "params": {
+            "top_k": 50,
+            "timeout_ms": 200,
+            "model_name": "rec_vec_model",
+            "enable_filter": false
+          }
+        },
+        {
+          "id": "idx_node",
+          "op_type": "IndexRecallOp",
+          "dependencies": ["parse_node"],
+          "optional": true,
+          "timeout_ms": 100
+        },
+        {
+          "id": "hot_node",
+          "op_type": "HotRecallOp",
+          "dependencies": ["parse_node"],
+          "optional": true,
+          "timeout_ms": 100
+        },
+        {
+          "id": "merge_node",
+          "op_type": "MergeOp",
+          "dependencies": ["vec_node", "idx_node", "hot_node"]
+        },
+        {
+          "id": "rank_node",
+          "op_type": "RankOp",
+          "dependencies": ["merge_node"]
+        }
+      ]
+    }
+  }
+}
