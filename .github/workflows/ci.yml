@@ -35,7 +35,7 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build -j$(nproc)
 
       - name: Test
         run: ./build/bin/minidag_test
