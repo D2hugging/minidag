@@ -1,5 +1,7 @@
 # minidag
 
+[![CI](https://github.com/D2hugging/minidag/actions/workflows/ci.yml/badge.svg)](https://github.com/D2hugging/minidag/actions/workflows/ci.yml)
+
 Header-only C++17 DAG execution engine for concurrent pipelines.
 
 ## Highlights
@@ -15,31 +17,13 @@ Header-only C++17 DAG execution engine for concurrent pipelines.
 
 ## Architecture Overview
 
-```
-                          Build time                          Runtime (per-request)
-                ┌───────────────────────────┐       ┌─────────────────────────────────┐
-                │                           │       │                                 │
-  NodeConfig[]  │   GraphTemplate::Build()  │       │        GraphExecutor::Run()      │
-  ───────────►  │                           │       │                                 │
-                │  ┌─────────┐  ┌────────┐  │       │  ┌─────────┐    ┌────────────┐  │
-                │  │OpFactory│─►│Operator│  │       │  │ Context │◄──►│  Operator  │  │
-                │  └─────────┘  └───┬────┘  │       │  │(per-req)│    │   ::Run()  │  │
-                │               Init│       │       │  └─────────┘    └────────────┘  │
-                │              ┌────▼────┐  │       │                                 │
-                │              │Registry │  │       │  atomic indegrees → schedule    │
-                │              └─────────┘  │       │  children when indegree → 0     │
-                └───────────────────────────┘       └─────────────────────────────────┘
-```
+![alt text](arch.png)
 
 Example search/recommend pipeline:
 
-```
-  QueryParse ──┬── VectorRecall ──┐
-               ├── IndexRecall  ──┼── Merge ── Rank
-               └── HotRecall   ──┘
-```
+![alt text](pipeline.png)
 
-Recall nodes run concurrently on the thread pool. Merge waits for all three (optional nodes degrade gracefully). Rank produces the final output.
+Recall nodes run concurrently on the thread pool. Merge waits for all recall nodes (optional nodes degrade gracefully). Rank produces the results by algorithm of choice. Rerank produces the final output.
 
 ## Quick Start
 
@@ -159,16 +143,16 @@ manager.BuildDag("search", node_configs);
 auto executor = manager.CreateExecutor("search");
 
 // 4. Inject input via typed token
-auto req_token = executor->GetTemplate().Token<UserRequest>("request");
-executor->GetContext().Set(req_token, UserRequest{1001, "iPhone 16"});
+auto req_token = executor->Template().Token<UserRequest>("request");
+executor->Ctx().Set(req_token, UserRequest{1001, "iPhone 16"});
 
 // 5. Run and wait
 auto future = executor->Run();
 future.get();  // blocks until complete (or throws on failure)
 
 // 6. Read output via typed token
-auto result_token = executor->GetTemplate().Token<RankResult>("final_result");
-const auto& result = executor->GetContext().Get(result_token);
+auto result_token = executor->Template().Token<RankResult>("final_result");
+const auto& result = executor->Ctx().Get(result_token);
 ```
 
 ### Cancellation and Timeouts

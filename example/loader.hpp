@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "mini_dag.hpp"
+
 class Loader {
  public:
   struct DagConfig {

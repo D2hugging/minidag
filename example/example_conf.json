@@ -55,6 +55,14 @@
               {"name": "item_click_rate", "type": "float"}
             ]
           }
+        },
+        {
+          "id": "rerank_node",
+          "op_type": "ReRankOp",
+          "dependencies": ["deep_rank_node"],
+          "params": {
+            "top_n": 10
+          }
         }
       ]
     },
@@ -101,6 +109,14 @@
           "id": "rank_node",
           "op_type": "RankOp",
           "dependencies": ["merge_node"]
+        },
+        {
+          "id": "rerank_node",
+          "op_type": "ReRankOp",
+          "dependencies": ["rank_node"],
+          "params": {
+            "top_n": 15
+          }
         }
       ]
     }

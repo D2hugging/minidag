@@ -81,11 +81,11 @@ class ThreadPool {
   }
 
   template <class F>
-  void enqueue(F&& f) {
+  void Enqueue(F&& f) {
     {
       std::unique_lock<std::mutex> lock(queue_mutex_);
       if (stop_) {
-        throw std::runtime_error("enqueue on stopped ThreadPool");
+        throw std::runtime_error("Enqueue on stopped ThreadPool");
       }
 
       tasks_.emplace(std::forward<F>(f));
@@ -223,7 +223,7 @@ class Registry {
     return {it->second, name};
   }
 
-  size_t TotalSlots() const { return slots_.size(); }
+  size_t SlotCount() const { return slots_.size(); }
   const std::vector<Meta>& Slots() const { return slots_; }
 
   const std::unordered_map<int, std::unordered_set<int>>& Producers() const {
@@ -234,7 +234,7 @@ class Registry {
   }
 
   // Slots consumed but never produced — must be injected externally
-  std::unordered_set<int> GraphInputSlots() const {
+  std::unordered_set<int> InputSlots() const {
     std::unordered_set<int> result;
     for (const auto& [slot, _] : consumers_) {
       if (producers_.find(slot) == producers_.end()) result.insert(slot);
@@ -243,7 +243,7 @@ class Registry {
   }
 
   // Slots produced but never consumed — available as graph outputs
-  std::unordered_set<int> GraphOutputSlots() const {
+  std::unordered_set<int> OutputSlots() const {
     std::unordered_set<int> result;
     for (const auto& [slot, _] : producers_) {
       if (consumers_.find(slot) == consumers_.end()) result.insert(slot);
@@ -291,8 +291,8 @@ class Operator {
  public:
   virtual ~Operator() = default;
   virtual void Configure(const ConfigNode& config) {}  // optional configuration
-  virtual void Init(Registry& reg) = 0;                // build phase: declare data deps
-  virtual void Run(Context& ctx) = 0;                  // runtime: pure computation
+  virtual void Init(Registry& reg) = 0;  // build phase: declare data deps
+  virtual void Run(Context& ctx) = 0;    // runtime: pure computation
   virtual std::string Name() const = 0;
 };
 
@@ -444,9 +444,9 @@ struct NodeConfig {
   std::string op_type;
   std::vector<std::string> dependencies;
 
-  ConfigNode params;       // optional per-operator config
-  bool optional = false;   // framework-level, NOT inside params
-  int timeout_ms = 0;      // 0 = no timeout check
+  ConfigNode params;      // optional per-operator config
+  bool optional = false;  // framework-level, NOT inside params
+  int timeout_ms = 0;     // 0 = no timeout check
 };
 
 // Immutable graph template (read-only, reusable across requests)
@@ -500,7 +500,7 @@ class GraphTemplate {
     ValidateCycle();
     ValidateDataFlow();
 
-    slot_count_ = registry_.TotalSlots();
+    slot_count_ = registry_.SlotCount();
     LogMsg(LogLevel::kInfo, "[GraphTemplate] Built successfully. Nodes: " +
                                 std::to_string(nodes_.size()) +
                                 ", DataSlots: " + std::to_string(slot_count_));
@@ -509,7 +509,7 @@ class GraphTemplate {
 
   const std::vector<NodeDef>& Nodes() const { return nodes_; }
   size_t SlotCount() const { return slot_count_; }
-  const Registry& GetRegistry() const { return registry_; }
+  const Registry& Reg() const { return registry_; }
 
   template <typename T>
   DataToken<T> Token(const std::string& name) const {
@@ -565,7 +565,7 @@ class GraphTemplate {
   // graph inputs (externally injected)
   void ValidateDataFlow() const {
     const auto& producers = registry_.Producers();
-    auto graph_inputs = registry_.GraphInputSlots();
+    auto graph_inputs = registry_.InputSlots();
 
     for (size_t i = 0; i < nodes_.size(); ++i) {
       const auto& consumers = registry_.Consumers();
@@ -636,8 +636,8 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
     context_.SetCancelFlag(&cancelled_);
   }
 
-  Context& GetContext() { return context_; }
-  const GraphTemplate& GetTemplate() const { return *tmpl_; }
+  Context& Ctx() { return context_; }
+  const GraphTemplate& Template() const { return *tmpl_; }
 
   void Cancel() { cancelled_.store(true, std::memory_order_release); }
 
@@ -714,7 +714,7 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
 
   void Schedule(int node_id) {
     auto self = shared_from_this();
-    pool_.enqueue([self, node_id] {
+    pool_.Enqueue([self, node_id] {
       // Check cancellation before running
       if (self->cancelled_.load(std::memory_order_acquire)) {
         self->DrainChildren(node_id);
@@ -745,12 +745,11 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
           self->PropagateSuccess(node_id);
         } else {
           self->cancelled_.store(true, std::memory_order_release);
-          self->LogMsg(LogLevel::kError,
-                       "[Executor] Exception in node: " + node.name + " — " +
-                           e.what());
+          self->LogMsg(LogLevel::kError, "[Executor] Exception in node: " +
+                                             node.name + " — " + e.what());
           self->DrainChildren(node_id);
-          if (self->remaining_tasks_.fetch_sub(
-                  1, std::memory_order_acq_rel) == 1) {
+          if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
+              1) {
           }
           self->TrySetException(std::current_exception());
         }
@@ -791,8 +790,8 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
           self->LogMsg(LogLevel::kError,
                        "[Executor] Required node timed out: " + node.name);
           self->DrainChildren(node_id);
-          if (self->remaining_tasks_.fetch_sub(
-                  1, std::memory_order_acq_rel) == 1) {
+          if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
+              1) {
           }
           self->TrySetException(std::make_exception_ptr(
               std::runtime_error("timeout: " + node.name)));
@@ -845,7 +844,7 @@ class DagManager {
     return std::make_shared<GraphExecutor>(it->second, *pool_, log_);
   }
 
-  std::shared_ptr<const GraphTemplate> GetDag(const std::string& name) const {
+  std::shared_ptr<const GraphTemplate> Dag(const std::string& name) const {
     std::shared_lock<std::shared_mutex> lock(mu_);
     auto it = dags_.find(name);
     if (it == dags_.end()) {
@@ -859,7 +858,7 @@ class DagManager {
     return dags_.count(name) > 0;
   }
 
-  std::vector<std::string> DagNames() const {
+  std::vector<std::string> ListDags() const {
     std::shared_lock<std::shared_mutex> lock(mu_);
     std::vector<std::string> names;
     names.reserve(dags_.size());

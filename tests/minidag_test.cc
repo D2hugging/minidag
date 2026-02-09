@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -7,8 +9,6 @@
 #include <vector>
 
 #include "mini_dag.hpp"
-
-#include <gtest/gtest.h>
 
 using namespace minidag;
 
@@ -101,9 +101,7 @@ class ConfigEchoOp : public Operator {
   void Init(Registry& reg) override {
     output_ = reg.Output<std::string>("config_echo_out");
   }
-  void Run(Context& ctx) override {
-    ctx.Set(output_, std::string(echo_val_));
-  }
+  void Run(Context& ctx) override { ctx.Set(output_, std::string(echo_val_)); }
   std::string Name() const override { return "ConfigEchoOp"; }
 
   const std::string& GetEchoVal() const { return echo_val_; }
@@ -215,7 +213,7 @@ TEST(ThreadPool, BasicEnqueueAndComplete) {
   {
     ThreadPool pool(4);
     for (int i = 0; i < 10; ++i) {
-      pool.enqueue([&counter] { counter.fetch_add(1); });
+      pool.Enqueue([&counter] { counter.fetch_add(1); });
     }
   }  // destructor joins
   EXPECT_EQ(counter.load(), 10);
@@ -226,7 +224,7 @@ TEST(ThreadPool, ConcurrentManyTasks) {
   {
     ThreadPool pool(4);
     for (int i = 0; i < 1000; ++i) {
-      pool.enqueue([&counter] { counter.fetch_add(1); });
+      pool.Enqueue([&counter] { counter.fetch_add(1); });
     }
   }
   EXPECT_EQ(counter.load(), 1000);
@@ -237,7 +235,7 @@ TEST(ThreadPool, DestructorJoinsAllThreads) {
   {
     ThreadPool pool(4);
     for (int i = 0; i < 100; ++i) {
-      pool.enqueue([&counter] {
+      pool.Enqueue([&counter] {
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         counter.fetch_add(1);
       });
@@ -252,7 +250,7 @@ TEST(ThreadPool, SingleThreadSerializesExecution) {
   {
     ThreadPool pool(1);
     for (int i = 0; i < 10; ++i) {
-      pool.enqueue([&order, &mu, i] {
+      pool.Enqueue([&order, &mu, i] {
         std::lock_guard<std::mutex> lock(mu);
         order.push_back(i);
       });
@@ -271,7 +269,7 @@ TEST(ThreadPool, SingleThreadSerializesExecution) {
 TEST(Context, SetGetRoundTripInt) {
   Registry reg;
   auto tok = reg.Output<int>("val");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   ctx.Set(tok, int(42));
   EXPECT_EQ(ctx.Get(tok), 42);
 }
@@ -279,7 +277,7 @@ TEST(Context, SetGetRoundTripInt) {
 TEST(Context, SetGetRoundTripString) {
   Registry reg;
   auto tok = reg.Output<std::string>("val");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   ctx.Set(tok, std::string("hello"));
   EXPECT_EQ(ctx.Get(tok), "hello");
 }
@@ -287,7 +285,7 @@ TEST(Context, SetGetRoundTripString) {
 TEST(Context, SetGetRoundTripVector) {
   Registry reg;
   auto tok = reg.Output<std::vector<int>>("val");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   ctx.Set(tok, std::vector<int>{1, 2, 3});
   EXPECT_EQ(ctx.Get(tok), (std::vector<int>{1, 2, 3}));
 }
@@ -300,7 +298,7 @@ struct Point {
 TEST(Context, SetGetRoundTripCustomStruct) {
   Registry reg;
   auto tok = reg.Output<Point>("pt");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   ctx.Set(tok, Point{3, 4});
   EXPECT_EQ(ctx.Get(tok), (Point{3, 4}));
 }
@@ -314,7 +312,7 @@ TEST(Context, GetInvalidTokenThrows) {
 TEST(Context, GetTypeMismatchThrows) {
   Registry reg;
   auto int_tok = reg.Output<int>("val");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   ctx.Set(int_tok, int(42));
   DataToken<std::string> str_tok{int_tok.index, "val"};
   EXPECT_THROW(ctx.Get(str_tok), std::runtime_error);
@@ -323,7 +321,7 @@ TEST(Context, GetTypeMismatchThrows) {
 TEST(Context, MoveSemantics) {
   Registry reg;
   auto tok = reg.Output<std::string>("val");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   ctx.Set(tok, std::string("moveme"));
   std::string moved = ctx.Move(tok);
   EXPECT_EQ(moved, "moveme");
@@ -341,7 +339,7 @@ TEST(Context, MoveInvalidTokenThrows) {
 TEST(Context, HasReturnsFalseForUnset) {
   Registry reg;
   auto tok = reg.Output<int>("val");
-  Context ctx(reg.TotalSlots());
+  Context ctx(reg.SlotCount());
   EXPECT_FALSE(ctx.Has(tok));
   ctx.Set(tok, int(1));
   EXPECT_TRUE(ctx.Has(tok));
@@ -375,7 +373,7 @@ TEST(Registry, InputOutputRegisterSlots) {
   EXPECT_TRUE(in.IsValid());
   EXPECT_TRUE(out.IsValid());
   EXPECT_NE(in.index, out.index);
-  EXPECT_EQ(reg.TotalSlots(), 2u);
+  EXPECT_EQ(reg.SlotCount(), 2u);
 }
 
 TEST(Registry, SameNameSameTypeReturnsSameToken) {
@@ -385,7 +383,7 @@ TEST(Registry, SameNameSameTypeReturnsSameToken) {
   reg.SetCurrentNode(1);
   auto t2 = reg.Output<int>("x");
   EXPECT_EQ(t1.index, t2.index);
-  EXPECT_EQ(reg.TotalSlots(), 1u);
+  EXPECT_EQ(reg.SlotCount(), 1u);
 }
 
 TEST(Registry, SameNameDifferentTypeThrows) {
@@ -432,22 +430,22 @@ TEST(Registry, ProducersConsumersTracking) {
   EXPECT_EQ(consumers.at(tok.index).count(1), 1u);
 }
 
-TEST(Registry, GraphInputSlots) {
+TEST(Registry, InputSlots) {
   Registry reg;
   reg.SetCurrentNode(0);
   reg.Input<int>("external");  // consumed but not produced
   reg.Output<int>("internal");
-  auto inputs = reg.GraphInputSlots();
+  auto inputs = reg.InputSlots();
   auto ext_tok = reg.Lookup<int>("external");
   EXPECT_EQ(inputs.count(ext_tok.index), 1u);
 }
 
-TEST(Registry, GraphOutputSlots) {
+TEST(Registry, OutputSlots) {
   Registry reg;
   reg.SetCurrentNode(0);
   reg.Output<int>("orphan");  // produced but not consumed
   reg.Input<int>("external");
-  auto outputs = reg.GraphOutputSlots();
+  auto outputs = reg.OutputSlots();
   auto orph_tok = reg.Lookup<int>("orphan");
   EXPECT_EQ(outputs.count(orph_tok.index), 1u);
 }
@@ -558,10 +556,9 @@ TEST(OpFactory, CreateUnregisteredOpThrows) {
 }
 
 TEST(OpFactory, MultipleRegisteredOpsAccessible) {
-  std::vector<std::string> names = {"AddOp",       "PassthroughOp",
-                                    "FailOp",      "SlowOp",
-                                    "ProducerOp",  "IntProducerOp",
-                                    "StringSinkOp"};
+  std::vector<std::string> names = {
+      "AddOp",      "PassthroughOp", "FailOp",      "SlowOp",
+      "ProducerOp", "IntProducerOp", "StringSinkOp"};
   for (const auto& name : names) {
     auto op = OpFactory::Get().Create(name);
     ASSERT_NE(op, nullptr) << "Failed to create: " << name;
@@ -657,8 +654,9 @@ TEST(GraphTemplate, DataFlowNoUpstreamProducerThrows) {
   };
   // "input" is consumed by PassthroughOp but produced by no one with an
   // upstream dependency edge, and also not produced by anyone at all here.
-  // Actually, ProducerOp produces "input" — let's use that but skip the dep edge.
-  // consumer reads "input", producer (ProducerOp) produces "input" but no dep edge.
+  // Actually, ProducerOp produces "input" — let's use that but skip the dep
+  // edge. consumer reads "input", producer (ProducerOp) produces "input" but no
+  // dep edge.
   std::vector<NodeConfig> configs2 = {
       {"producer", "ProducerOp", {}, {}, false, 0},
       {"consumer", "PassthroughOp", {}, {}, false, 0},
@@ -719,8 +717,8 @@ TEST_F(GraphExecutorTest, LinearDagExecutesCorrectResult) {
   auto future = exec->Run();
   future.get();
 
-  auto tok = exec->GetTemplate().Token<int>("sum");
-  EXPECT_EQ(exec->GetContext().Get(tok), 10);
+  auto tok = exec->Template().Token<int>("sum");
+  EXPECT_EQ(exec->Ctx().Get(tok), 10);
 }
 
 TEST_F(GraphExecutorTest, DiamondDagExecutesCorrectResult) {
@@ -738,8 +736,8 @@ TEST_F(GraphExecutorTest, DiamondDagExecutesCorrectResult) {
   auto future = exec->Run();
   future.get();
 
-  auto tok = exec->GetTemplate().Token<std::string>("merged_string");
-  auto result = exec->GetContext().Get(tok);
+  auto tok = exec->Template().Token<std::string>("merged_string");
+  auto result = exec->Ctx().Get(tok);
   // Both branches produce values; order may vary but both present
   EXPECT_TRUE(result.find("produced_value") != std::string::npos);
   EXPECT_TRUE(result.find("slow_done") != std::string::npos);
@@ -844,14 +842,14 @@ TEST_F(GraphExecutorTest, TimeoutRequiredNodeThrows) {
   EXPECT_THROW(future.get(), std::exception);
 }
 
-TEST_F(GraphExecutorTest, GetTemplateReturnsSameTemplate) {
+TEST_F(GraphExecutorTest, TemplateReturnsSameTemplate) {
   std::vector<NodeConfig> configs = {
       {"producer", "ProducerOp", {}, {}, false, 0},
   };
   auto tmpl = std::make_shared<GraphTemplate>();
   tmpl->Build(configs, silent);
   auto exec = std::make_shared<GraphExecutor>(tmpl, pool_, silent);
-  EXPECT_EQ(&exec->GetTemplate(), tmpl.get());
+  EXPECT_EQ(&exec->Template(), tmpl.get());
 }
 
 TEST_F(GraphExecutorTest, ExternalInputInjection) {
@@ -866,27 +864,27 @@ TEST_F(GraphExecutorTest, ExternalInputInjection) {
   ASSERT_TRUE(input_tok.IsValid());
 
   auto exec = std::make_shared<GraphExecutor>(tmpl, pool_, silent);
-  exec->GetContext().Set(input_tok, std::string("injected"));
+  exec->Ctx().Set(input_tok, std::string("injected"));
 
   auto future = exec->Run();
   future.get();
 
   auto output_tok = tmpl->Token<std::string>("output");
-  EXPECT_EQ(exec->GetContext().Get(output_tok), "injected");
+  EXPECT_EQ(exec->Ctx().Get(output_tok), "injected");
 }
 
 // ============================================================
 // H. DagManager Tests
 // ============================================================
 
-TEST(DagManager, BuildAndHasAndGetRoundTrip) {
+TEST(DagManager, BuildAndHasAndDagRoundTrip) {
   DagManager mgr(2, silent);
   std::vector<NodeConfig> configs = {
       {"producer", "ProducerOp", {}, {}, false, 0},
   };
   mgr.BuildDag("test", configs);
   EXPECT_TRUE(mgr.HasDag("test"));
-  auto tmpl = mgr.GetDag("test");
+  auto tmpl = mgr.Dag("test");
   ASSERT_NE(tmpl, nullptr);
   EXPECT_EQ(tmpl->Nodes().size(), 1u);
 }
@@ -905,9 +903,9 @@ TEST(DagManager, CreateExecutorUnknownNameThrows) {
   EXPECT_THROW(mgr.CreateExecutor("ghost"), std::runtime_error);
 }
 
-TEST(DagManager, GetDagUnknownNameThrows) {
+TEST(DagManager, DagUnknownNameThrows) {
   DagManager mgr(2, silent);
-  EXPECT_THROW(mgr.GetDag("ghost"), std::runtime_error);
+  EXPECT_THROW(mgr.Dag("ghost"), std::runtime_error);
 }
 
 TEST(DagManager, HasDagReturnsFalseForUnknown) {
@@ -915,11 +913,11 @@ TEST(DagManager, HasDagReturnsFalseForUnknown) {
   EXPECT_FALSE(mgr.HasDag("nope"));
 }
 
-TEST(DagManager, DagNamesReturnsAllRegistered) {
+TEST(DagManager, ListDagsReturnsAllRegistered) {
   DagManager mgr(2, silent);
   mgr.BuildDag("alpha", {{"p", "ProducerOp", {}, {}, false, 0}});
   mgr.BuildDag("beta", {{"p", "ProducerOp", {}, {}, false, 0}});
-  auto names = mgr.DagNames();
+  auto names = mgr.ListDags();
   std::set<std::string> name_set(names.begin(), names.end());
   EXPECT_EQ(name_set, (std::set<std::string>{"alpha", "beta"}));
 }
@@ -937,7 +935,7 @@ TEST(DagManager, ReplaceDagSwapsTemplate) {
 
   auto exec1 = mgr.CreateExecutor("math");
   exec1->Run().get();
-  EXPECT_EQ(exec1->GetContext().Get(exec1->GetTemplate().Token<int>("sum")), 3);
+  EXPECT_EQ(exec1->Ctx().Get(exec1->Template().Token<int>("sum")), 3);
 
   // Replace: produces a=10, b=20 -> sum=30
   std::vector<NodeConfig> v2 = {
@@ -950,14 +948,13 @@ TEST(DagManager, ReplaceDagSwapsTemplate) {
 
   auto exec2 = mgr.CreateExecutor("math");
   exec2->Run().get();
-  EXPECT_EQ(exec2->GetContext().Get(exec2->GetTemplate().Token<int>("sum")), 30);
+  EXPECT_EQ(exec2->Ctx().Get(exec2->Template().Token<int>("sum")), 30);
 }
 
 TEST(DagManager, ReplaceDagUnknownNameThrows) {
   DagManager mgr(2, silent);
   EXPECT_THROW(
-      mgr.ReplaceDag("nonexistent",
-                      {{"p", "ProducerOp", {}, {}, false, 0}}),
+      mgr.ReplaceDag("nonexistent", {{"p", "ProducerOp", {}, {}, false, 0}}),
       std::runtime_error);
 }
 
@@ -986,16 +983,12 @@ TEST(DagManager, HotReloadOldExecutorKeepsOldTemplate) {
 
   // Old executor still runs with old template
   old_exec->Run().get();
-  EXPECT_EQ(
-      old_exec->GetContext().Get(old_exec->GetTemplate().Token<int>("sum")),
-      10);
+  EXPECT_EQ(old_exec->Ctx().Get(old_exec->Template().Token<int>("sum")), 10);
 
   // New executor gets new result
   auto new_exec = mgr.CreateExecutor("hr");
   new_exec->Run().get();
-  EXPECT_EQ(
-      new_exec->GetContext().Get(new_exec->GetTemplate().Token<int>("sum")),
-      300);
+  EXPECT_EQ(new_exec->Ctx().Get(new_exec->Template().Token<int>("sum")), 300);
 }
 
 // ============================================================
@@ -1017,8 +1010,8 @@ TEST(Integration, MultiOperatorPipelineEndToEnd) {
   auto future = exec->Run();
   future.get();
 
-  auto tok = exec->GetTemplate().Token<std::string>("merged_string");
-  auto result = exec->GetContext().Get(tok);
+  auto tok = exec->Template().Token<std::string>("merged_string");
+  auto result = exec->Ctx().Get(tok);
   EXPECT_FALSE(result.empty());
   EXPECT_TRUE(result.find("produced_value") != std::string::npos);
   EXPECT_TRUE(result.find("slow_done") != std::string::npos);
@@ -1053,8 +1046,8 @@ TEST(Integration, MultipleDAGsInSameDagManager) {
   f1.get();
   f2.get();
 
-  EXPECT_EQ(e1->GetContext().Get(e1->GetTemplate().Token<int>("sum")), 5);
-  EXPECT_EQ(e2->GetContext().Get(e2->GetTemplate().Token<int>("sum")), 300);
+  EXPECT_EQ(e1->Ctx().Get(e1->Template().Token<int>("sum")), 5);
+  EXPECT_EQ(e2->Ctx().Get(e2->Template().Token<int>("sum")), 300);
 }
 
 // ============================================================
@@ -1078,8 +1071,8 @@ TEST(ConcurrencyStress, ConcurrentExecutions) {
       auto exec = mgr.CreateExecutor("stress");
       auto future = exec->Run();
       future.get();
-      auto tok = exec->GetTemplate().Token<int>("sum");
-      if (exec->GetContext().Get(tok) == 10) {
+      auto tok = exec->Template().Token<int>("sum");
+      if (exec->Ctx().Get(tok) == 10) {
         success.fetch_add(1);
       }
     });
@@ -1110,8 +1103,8 @@ TEST(ConcurrencyStress, ConcurrentCreateAndReplace) {
           auto exec = mgr.CreateExecutor("live");
           auto future = exec->Run();
           future.get();
-          auto tok = exec->GetTemplate().Token<int>("sum");
-          int val = exec->GetContext().Get(tok);
+          auto tok = exec->Template().Token<int>("sum");
+          int val = exec->Ctx().Get(tok);
           // Value should be either 2 (original) or 1000 (replaced)
           if (val == 2 || val == 1000) {
             reads_ok.fetch_add(1);

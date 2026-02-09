@@ -2,31 +2,56 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format 21
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/keyrings/llvm.asc > /dev/null
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-format-21
+      - name: Check clang-format
+        run: |
+          clang-format-21 --version
+          find include example server tests -name '*.hpp' -o -name '*.cc' \
+            | xargs clang-format-21 --dry-run --Werror
+
   build:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (Debug)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Cache FetchContent deps
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
 
-      - name: Build (Debug)
-        run: cmake --build build
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
-      - name: Test (Debug)
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Test
         run: ./build/bin/minidag_test
 
-      - name: Configure (Release)
-        run: cmake -B build-release -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build (Release)
-        run: cmake --build build-release
-
-      - name: Test (Release)
-        run: ./build-release/bin/minidag_test
+  build-ok:
+    if: always()
+    needs: [format, build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ needs.format.result }}" = "success" ] &&
+          [ "${{ needs.build.result }}" = "success" ] || exit 1

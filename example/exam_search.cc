@@ -2,8 +2,8 @@
 #include <iostream>
 #include <string>
 
-#include "operators.hpp"
 #include "loader.hpp"
+#include "operators.hpp"
 
 int main(int argc, char** argv) {
   std::string config_path = "../example/example_conf.json";
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
   }
 
   // 4. Simulate traffic for each DAG
-  for (const auto& dag_name : manager.DagNames()) {
+  for (const auto& dag_name : manager.ListDags()) {
     std::cout << "\n====== Running DAG: " << dag_name << " ======" << std::endl;
 
     for (int i = 0; i < 3; ++i) {
@@ -51,9 +51,8 @@ int main(int argc, char** argv) {
       auto executor = manager.CreateExecutor(dag_name);
 
       // Look up token via Registry (no hard-coded index)
-      auto req_token = executor->GetTemplate().Token<UserRequest>("request");
-      executor->GetContext().Set(req_token,
-                                 UserRequest{1000L + i, "iPhone 16"});
+      auto req_token = executor->Template().Token<UserRequest>("request");
+      executor->Ctx().Set(req_token, UserRequest{1000L + i, "iPhone 16"});
 
       try {
         auto future = executor->Run();
@@ -65,9 +64,9 @@ int main(int argc, char** argv) {
           future.get();
 
           auto result_token =
-              executor->GetTemplate().Token<RankResult>("final_result");
+              executor->Template().Token<RankResult>("final_result");
           if (result_token.IsValid()) {
-            const auto& result = executor->GetContext().Get(result_token);
+            const auto& result = executor->Ctx().Get(result_token);
             if (!result.final_items.empty()) {
               std::cout << "Top result ID: " << result.final_items[0].id
                         << " score: " << result.final_items[0].score
