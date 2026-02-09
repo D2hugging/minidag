@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -7,8 +9,6 @@
 #include <vector>
 
 #include "mini_dag.hpp"
-
-#include <gtest/gtest.h>
 
 using namespace minidag;
 
@@ -101,9 +101,7 @@ class ConfigEchoOp : public Operator {
   void Init(Registry& reg) override {
     output_ = reg.Output<std::string>("config_echo_out");
   }
-  void Run(Context& ctx) override {
-    ctx.Set(output_, std::string(echo_val_));
-  }
+  void Run(Context& ctx) override { ctx.Set(output_, std::string(echo_val_)); }
   std::string Name() const override { return "ConfigEchoOp"; }
 
   const std::string& GetEchoVal() const { return echo_val_; }
@@ -558,10 +556,9 @@ TEST(OpFactory, CreateUnregisteredOpThrows) {
 }
 
 TEST(OpFactory, MultipleRegisteredOpsAccessible) {
-  std::vector<std::string> names = {"AddOp",       "PassthroughOp",
-                                    "FailOp",      "SlowOp",
-                                    "ProducerOp",  "IntProducerOp",
-                                    "StringSinkOp"};
+  std::vector<std::string> names = {
+      "AddOp",      "PassthroughOp", "FailOp",      "SlowOp",
+      "ProducerOp", "IntProducerOp", "StringSinkOp"};
   for (const auto& name : names) {
     auto op = OpFactory::Get().Create(name);
     ASSERT_NE(op, nullptr) << "Failed to create: " << name;
@@ -657,8 +654,9 @@ TEST(GraphTemplate, DataFlowNoUpstreamProducerThrows) {
   };
   // "input" is consumed by PassthroughOp but produced by no one with an
   // upstream dependency edge, and also not produced by anyone at all here.
-  // Actually, ProducerOp produces "input" — let's use that but skip the dep edge.
-  // consumer reads "input", producer (ProducerOp) produces "input" but no dep edge.
+  // Actually, ProducerOp produces "input" — let's use that but skip the dep
+  // edge. consumer reads "input", producer (ProducerOp) produces "input" but no
+  // dep edge.
   std::vector<NodeConfig> configs2 = {
       {"producer", "ProducerOp", {}, {}, false, 0},
       {"consumer", "PassthroughOp", {}, {}, false, 0},
@@ -956,8 +954,7 @@ TEST(DagManager, ReplaceDagSwapsTemplate) {
 TEST(DagManager, ReplaceDagUnknownNameThrows) {
   DagManager mgr(2, silent);
   EXPECT_THROW(
-      mgr.ReplaceDag("nonexistent",
-                      {{"p", "ProducerOp", {}, {}, false, 0}}),
+      mgr.ReplaceDag("nonexistent", {{"p", "ProducerOp", {}, {}, false, 0}}),
       std::runtime_error);
 }
 
@@ -986,16 +983,12 @@ TEST(DagManager, HotReloadOldExecutorKeepsOldTemplate) {
 
   // Old executor still runs with old template
   old_exec->Run().get();
-  EXPECT_EQ(
-      old_exec->Ctx().Get(old_exec->Template().Token<int>("sum")),
-      10);
+  EXPECT_EQ(old_exec->Ctx().Get(old_exec->Template().Token<int>("sum")), 10);
 
   // New executor gets new result
   auto new_exec = mgr.CreateExecutor("hr");
   new_exec->Run().get();
-  EXPECT_EQ(
-      new_exec->Ctx().Get(new_exec->Template().Token<int>("sum")),
-      300);
+  EXPECT_EQ(new_exec->Ctx().Get(new_exec->Template().Token<int>("sum")), 300);
 }
 
 // ============================================================

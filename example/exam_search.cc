@@ -2,8 +2,8 @@
 #include <iostream>
 #include <string>
 
-#include "operators.hpp"
 #include "loader.hpp"
+#include "operators.hpp"
 
 int main(int argc, char** argv) {
   std::string config_path = "../example/example_conf.json";
@@ -52,8 +52,7 @@ int main(int argc, char** argv) {
 
       // Look up token via Registry (no hard-coded index)
       auto req_token = executor->Template().Token<UserRequest>("request");
-      executor->Ctx().Set(req_token,
-                                 UserRequest{1000L + i, "iPhone 16"});
+      executor->Ctx().Set(req_token, UserRequest{1000L + i, "iPhone 16"});
 
       try {
         auto future = executor->Run();

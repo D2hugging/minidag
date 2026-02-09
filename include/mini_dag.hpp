@@ -291,8 +291,8 @@ class Operator {
  public:
   virtual ~Operator() = default;
   virtual void Configure(const ConfigNode& config) {}  // optional configuration
-  virtual void Init(Registry& reg) = 0;                // build phase: declare data deps
-  virtual void Run(Context& ctx) = 0;                  // runtime: pure computation
+  virtual void Init(Registry& reg) = 0;  // build phase: declare data deps
+  virtual void Run(Context& ctx) = 0;    // runtime: pure computation
   virtual std::string Name() const = 0;
 };
 
@@ -444,9 +444,9 @@ struct NodeConfig {
   std::string op_type;
   std::vector<std::string> dependencies;
 
-  ConfigNode params;       // optional per-operator config
-  bool optional = false;   // framework-level, NOT inside params
-  int timeout_ms = 0;      // 0 = no timeout check
+  ConfigNode params;      // optional per-operator config
+  bool optional = false;  // framework-level, NOT inside params
+  int timeout_ms = 0;     // 0 = no timeout check
 };
 
 // Immutable graph template (read-only, reusable across requests)
@@ -745,12 +745,11 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
           self->PropagateSuccess(node_id);
         } else {
           self->cancelled_.store(true, std::memory_order_release);
-          self->LogMsg(LogLevel::kError,
-                       "[Executor] Exception in node: " + node.name + " — " +
-                           e.what());
+          self->LogMsg(LogLevel::kError, "[Executor] Exception in node: " +
+                                             node.name + " — " + e.what());
           self->DrainChildren(node_id);
-          if (self->remaining_tasks_.fetch_sub(
-                  1, std::memory_order_acq_rel) == 1) {
+          if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
+              1) {
           }
           self->TrySetException(std::current_exception());
         }
@@ -791,8 +790,8 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
           self->LogMsg(LogLevel::kError,
                        "[Executor] Required node timed out: " + node.name);
           self->DrainChildren(node_id);
-          if (self->remaining_tasks_.fetch_sub(
-                  1, std::memory_order_acq_rel) == 1) {
+          if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
+              1) {
           }
           self->TrySetException(std::make_exception_ptr(
               std::runtime_error("timeout: " + node.name)));
