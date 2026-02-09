@@ -217,7 +217,7 @@ class RankOp : public Operator {
  public:
   void Init(Registry& reg) override {
     input_ = reg.Input<std::vector<Item>>("merged_list");
-    output_ = reg.Output<RankResult>("final_result");
+    output_ = reg.Output<RankResult>("ranked_list");
   }
   void Run(Context& ctx) override {
     auto items = ctx.Get(input_);  // Copy
@@ -266,7 +266,7 @@ class DeepRankOp : public Operator {
 
   void Init(Registry& reg) override {
     input_ = reg.Input<std::vector<Item>>("merged_list");
-    output_ = reg.Output<RankResult>("final_result");
+    output_ = reg.Output<RankResult>("ranked_list");
   }
 
   void Run(Context& ctx) override {
@@ -297,3 +297,40 @@ class DeepRankOp : public Operator {
 };
 
 REGISTER_OP(DeepRankOp);
+
+// 7. Reranking operator (post-ranking refinement)
+class ReRankOp : public Operator {
+ public:
+  void Configure(const ConfigNode& conf) override {
+    top_n_ = conf["top_n"].As<int>(10);
+  }
+
+  void Init(Registry& reg) override {
+    input_ = reg.Input<RankResult>("ranked_list");
+    output_ = reg.Output<RankResult>("final_result");
+  }
+
+  void Run(Context& ctx) override {
+    auto ranked = ctx.Get(input_);
+    SleepMs(20);
+    // Simulate reranking: apply diversity/business-rule adjustments
+    for (auto& item : ranked.final_items) {
+      item.score *= 1.05f;
+    }
+    // Truncate to top_n
+    if (static_cast<int>(ranked.final_items.size()) > top_n_) {
+      ranked.final_items.resize(top_n_);
+    }
+    printf("[ReRank] Reranked to top %d items\n", top_n_);
+    ctx.Set(output_, std::move(ranked));
+  }
+
+  std::string Name() const override { return "ReRank"; }
+
+ private:
+  DataToken<RankResult> input_;
+  DataToken<RankResult> output_;
+  int top_n_ = 10;
+};
+
+REGISTER_OP(ReRankOp);

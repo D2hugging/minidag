@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   // List DAGs
   svr.Get("/api/v1/dags",
           [&manager](const httplib::Request&, httplib::Response& res) {
-            res.set_content(json{{"dags", manager.DagNames()}}.dump(),
+            res.set_content(json{{"dags", manager.ListDags()}}.dump(),
                             "application/json");
           });
 
@@ -122,8 +122,8 @@ int main(int argc, char** argv) {
                auto executor = manager.CreateExecutor(dag_name);
 
                auto req_token =
-                   executor->GetTemplate().Token<UserRequest>("request");
-               executor->GetContext().Set(req_token, std::move(user_req));
+                   executor->Template().Token<UserRequest>("request");
+               executor->Ctx().Set(req_token, std::move(user_req));
 
                auto future = executor->Run();
                if (future.wait_for(std::chrono::milliseconds(timeout_ms)) ==
@@ -164,11 +164,11 @@ int main(int argc, char** argv) {
                // Extract result
                json result_json = nullptr;
                auto result_token =
-                   executor->GetTemplate().Token<RankResult>("final_result");
+                   executor->Template().Token<RankResult>("final_result");
                if (result_token.IsValid() &&
-                   executor->GetContext().Has(result_token)) {
+                   executor->Ctx().Has(result_token)) {
                  const auto& rank_result =
-                     executor->GetContext().Get(result_token);
+                     executor->Ctx().Get(result_token);
                  result_json = json{{"final_result", rank_result}};
                }
 
