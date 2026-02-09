@@ -46,3 +46,12 @@ jobs:
 
       - name: Test
         run: ./build/bin/minidag_test
+
+  build-ok:
+    if: always()
+    needs: [format, build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ needs.format.result }}" = "success" ] &&
+          [ "${{ needs.build.result }}" = "success" ] || exit 1
