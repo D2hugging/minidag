@@ -11,11 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install clang-format 21
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble main"
+          sudo apt-get update
+          sudo apt-get install -y clang-format-21
       - name: Check clang-format
         run: |
-          clang-format --version
+          clang-format-21 --version
           find include example server tests -name '*.hpp' -o -name '*.cc' \
-            | xargs clang-format --dry-run --Werror
+            | xargs clang-format-21 --dry-run --Werror
 
   build:
     runs-on: ubuntu-latest
