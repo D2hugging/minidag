@@ -1,5 +1,7 @@
 # minidag
 
+[![CI](https://github.com/D2hugging/minidag/actions/workflows/ci.yml/badge.svg)](https://github.com/D2hugging/minidag/actions/workflows/ci.yml)
+
 Header-only C++17 DAG execution engine for concurrent pipelines.
 
 ## Highlights

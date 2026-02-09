@@ -7,26 +7,35 @@ on:
     branches: [main]
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check clang-format
+        run: |
+          clang-format --version
+          find include example server tests -name '*.hpp' -o -name '*.cc' \
+            | xargs clang-format --dry-run --Werror
+
   build:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (Debug)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Cache FetchContent deps
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
 
-      - name: Build (Debug)
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build
         run: cmake --build build
 
-      - name: Test (Debug)
+      - name: Test
         run: ./build/bin/minidag_test
-
-      - name: Configure (Release)
-        run: cmake -B build-release -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build (Release)
-        run: cmake --build build-release
-
-      - name: Test (Release)
-        run: ./build-release/bin/minidag_test
