@@ -25,24 +25,6 @@ add_executable(exam_search example/exam_search.cc)
 target_link_libraries(exam_search nlohmann_json::nlohmann_json)
 
 target_compile_features(exam_search PRIVATE cxx_std_17)
-
-# ---- HTTP Server ----
-option(MINIDAG_BUILD_SERVER "Build HTTP server" ON)
-
-if(MINIDAG_BUILD_SERVER)
-  FetchContent_Declare(
-      httplib
-      GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-      GIT_TAG        v0.18.3
-  )
-  set(HTTPLIB_COMPILE OFF CACHE BOOL "" FORCE)
-  FetchContent_MakeAvailable(httplib)
-
-  add_executable(minidag_server server/minidag_server.cc)
-  target_link_libraries(minidag_server nlohmann_json::nlohmann_json httplib::httplib)
-  target_compile_features(minidag_server PRIVATE cxx_std_17)
-endif()
-
 # ---- Testing ----
 option(MINIDAG_BUILD_TESTS "Build unit tests" ON)
 

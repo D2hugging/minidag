@@ -21,7 +21,7 @@ jobs:
       - name: Check clang-format
         run: |
           clang-format-21 --version
-          find include example server tests -name '*.hpp' -o -name '*.cc' \
+          find include example tests -name '*.hpp' -o -name '*.cc' \
             | xargs clang-format-21 --dry-run --Werror
 
   build:

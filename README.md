@@ -1,6 +1,10 @@
 # minidag
 
 [![CI](https://github.com/D2hugging/minidag/actions/workflows/ci.yml/badge.svg)](https://github.com/D2hugging/minidag/actions/workflows/ci.yml)
+![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)
+![Header-only](https://img.shields.io/badge/header--only-yes-green.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Stars](https://img.shields.io/github/stars/D2hugging/minidag)](https://github.com/D2hugging/minidag)
 
 Header-only C++17 DAG execution engine for concurrent pipelines.
 
@@ -13,7 +17,6 @@ Header-only C++17 DAG execution engine for concurrent pipelines.
 - **Per-request metrics** (duration, skipped, timed\_out)
 - **Data-driven graph topology** via JSON config
 - **Multi-DAG management** with hot-reload (`DagManager`)
-- **Built-in HTTP server** + **Python client**
 
 ## Architecture Overview
 
@@ -33,7 +36,6 @@ Recall nodes run concurrently on the thread pool. Merge waits for all recall nod
 - C++17 compiler (GCC 8+, Clang 7+, MSVC 19.14+)
 - Dependencies fetched automatically via `FetchContent`:
   [nlohmann/json](https://github.com/nlohmann/json),
-  [cpp-httplib](https://github.com/yhirose/cpp-httplib),
   [googletest](https://github.com/google/googletest)
 
 ### Build
@@ -182,76 +184,6 @@ for (const auto& m : executor->Metrics()) {
 manager.ReplaceDag("search", new_node_configs);  // atomic swap
 ```
 
-## HTTP Server
-
-### Starting the server
-
-```bash
-./build/bin/minidag_server --config example/example_conf.json --host 0.0.0.0 --port 8080
-```
-
-### API Reference
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/health` | Health check |
-| `GET` | `/api/v1/dags` | List available DAGs |
-| `POST` | `/api/v1/dags/{name}/run` | Execute a DAG |
-
-**`POST /api/v1/dags/{name}/run`** -- request body:
-
-```json
-{
-  "request": { "uid": 1001, "query": "iPhone 16" },
-  "timeout_ms": 2000
-}
-```
-
-Response (200):
-
-```json
-{
-  "dag": "search",
-  "result": { "final_result": { "final_items": [{"id": 113, "score": 1.0}] } },
-  "total_us": 12345,
-  "metrics": [
-    { "name": "parse_node", "duration_us": 50, "skipped": false, "timed_out": false }
-  ]
-}
-```
-
-| Status | Meaning |
-|--------|---------|
-| 400 | Invalid JSON or missing `request` object |
-| 404 | Unknown DAG name |
-| 500 | DAG execution failed |
-| 504 | DAG execution timed out |
-
-## Python Client
-
-### Install
-
-```bash
-cd python && pip install -e .
-```
-
-### Usage
-
-```python
-from minidag import MinidagClient
-
-client = MinidagClient("http://localhost:8080")
-
-client.health()        # {"status": "ok"}
-client.list_dags()     # ["search", "recommend"]
-
-result = client.run_dag("search", uid=1001, query="iPhone 16")
-print(result.dag)       # "search"
-print(result.total_us)  # 12345
-for m in result.metrics:
-    print(f"  {m.name}: {m.duration_us}us")
-```
-
 ## Project Structure
 
 ```
@@ -264,13 +196,6 @@ minidag/
     loader.hpp              # JSON-to-ConfigNode bridge using nlohmann/json
     exam_search.cc          # Example binary: runs search + recommend DAGs
     example_conf.json       # Two-pipeline JSON config
-  server/
-    minidag_server.cc       # HTTP server wrapping DagManager
-  python/
-    minidag/
-      __init__.py
-      client.py             # Python client (MinidagClient)
-    pyproject.toml
   tests/
     minidag_test.cc         # Unit tests (Google Test)
   CMakeLists.txt
@@ -280,14 +205,13 @@ minidag/
 
 | CMake Option | Default | Description |
 |-------------|---------|-------------|
-| `MINIDAG_BUILD_SERVER` | `ON` | Build the HTTP server (`minidag_server`) |
 | `MINIDAG_BUILD_TESTS` | `ON` | Build unit tests (`minidag_test`) |
 | `CMAKE_BUILD_TYPE` | -- | `Debug` (with sanitizers) or `Release` (with `-O2`) |
 
-To disable the server and tests:
+To disable tests:
 
 ```bash
-cmake -B build -DMINIDAG_BUILD_SERVER=OFF -DMINIDAG_BUILD_TESTS=OFF
+cmake -B build -DMINIDAG_BUILD_TESTS=OFF
 ```
 
 ## License
