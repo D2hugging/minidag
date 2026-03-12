@@ -12,7 +12,7 @@ Header-only C++17 DAG execution engine for concurrent pipelines.
 
 - **Header-only** -- single file: `include/mini_dag.hpp`
 - **Lock-free scheduling** with atomic indegree propagation
-- **Type-safe data passing** between operators (`DataToken<T>` + `Context`)
+- **Type-safe data passing** between operators (`SlotHandle<T>` + `Context`)
 - **Per-node timeout**, optional nodes, cancellation
 - **Per-request metrics** (duration, skipped, timed\_out)
 - **Data-driven graph topology** via JSON config
@@ -80,8 +80,8 @@ class MyOp : public Operator {
   std::string Name() const override { return "MyOp"; }
 
  private:
-  DataToken<std::string> in_;
-  DataToken<int> out_;
+  SlotHandle<std::string> in_;
+  SlotHandle<int> out_;
 };
 REGISTER_OP(MyOp);
 ```
@@ -144,17 +144,17 @@ manager.BuildDag("search", node_configs);
 // 3. Create a per-request executor
 auto executor = manager.CreateExecutor("search");
 
-// 4. Inject input via typed token
-auto req_token = executor->Template().Token<UserRequest>("request");
-executor->Ctx().Set(req_token, UserRequest{1001, "iPhone 16"});
+// 4. Inject input via typed handle
+auto req_handle = executor->Template().Handle<UserRequest>("request");
+executor->Ctx().Set(req_handle, UserRequest{1001, "iPhone 16"});
 
 // 5. Run and wait
 auto future = executor->Run();
 future.get();  // blocks until complete (or throws on failure)
 
-// 6. Read output via typed token
-auto result_token = executor->Template().Token<RankResult>("final_result");
-const auto& result = executor->Ctx().Get(result_token);
+// 6. Read output via typed handle
+auto result_handle = executor->Template().Handle<RankResult>("final_result");
+const auto& result = executor->Ctx().Get(result_handle);
 ```
 
 ### Cancellation and Timeouts

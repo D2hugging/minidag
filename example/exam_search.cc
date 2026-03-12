@@ -50,9 +50,9 @@ int main(int argc, char** argv) {
 
       auto executor = manager.CreateExecutor(dag_name);
 
-      // Look up token via Registry (no hard-coded index)
-      auto req_token = executor->Template().Token<UserRequest>("request");
-      executor->Ctx().Set(req_token, UserRequest{1000L + i, "iPhone 16"});
+      // Look up handle via Registry (no hard-coded index)
+      auto req_handle = executor->Template().Handle<UserRequest>("request");
+      executor->Ctx().Set(req_handle, UserRequest{1000L + i, "iPhone 16"});
 
       try {
         auto future = executor->Run();
@@ -63,10 +63,10 @@ int main(int argc, char** argv) {
         } else {
           future.get();
 
-          auto result_token =
-              executor->Template().Token<RankResult>("final_result");
-          if (result_token.IsValid()) {
-            const auto& result = executor->Ctx().Get(result_token);
+          auto result_handle =
+              executor->Template().Handle<RankResult>("final_result");
+          if (result_handle.IsValid()) {
+            const auto& result = executor->Ctx().Get(result_handle);
             if (!result.final_items.empty()) {
               std::cout << "Top result ID: " << result.final_items[0].id
                         << " score: " << result.final_items[0].score
