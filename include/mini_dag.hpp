@@ -118,7 +118,7 @@ class ThreadPool {
 
 // Strongly-typed token; avoids raw string/int keys
 template <typename T>
-struct DataToken {
+struct SlotHandle {
   int index = -1;
   std::string name;
   bool IsValid() const { return index != -1; }
@@ -136,14 +136,14 @@ class Context {
 
   // Write data (wait-free)
   template <typename T>
-  void Set(const DataToken<T>& token, T&& value) {
+  void Set(const SlotHandle<T>& token, T&& value) {
     if (!token.IsValid()) return;
     data_[token.index].value = std::forward<T>(value);
   }
 
   // Read data (wait-free, immutable)
   template <typename T>
-  const T& Get(const DataToken<T>& token) const {
+  const T& Get(const SlotHandle<T>& token) const {
     if (!token.IsValid()) {
       throw std::runtime_error("Invalid token access: " + token.name);
     }
@@ -157,7 +157,7 @@ class Context {
 
   // Move-extract data (transfer ownership to the next stage or final output)
   template <typename T>
-  T Move(const DataToken<T>& token) {
+  T Move(const SlotHandle<T>& token) {
     if (!token.IsValid()) {
       throw std::runtime_error("Invalid token move");
     }
@@ -167,7 +167,7 @@ class Context {
 
   // Check whether a slot has been populated (safe for optional inputs)
   template <typename T>
-  bool Has(const DataToken<T>& token) const {
+  bool Has(const SlotHandle<T>& token) const {
     if (!token.IsValid()) return false;
     return data_[token.index].value.has_value();
   }
@@ -198,21 +198,21 @@ class Registry {
   void SetCurrentNode(int node_id) { current_node_ = node_id; }
 
   template <typename T>
-  DataToken<T> Input(const std::string& name) {
+  SlotHandle<T> Input(const std::string& name) {
     auto tok = RegisterSlot<T>(name);
     consumers_[tok.index].insert(current_node_);
     return tok;
   }
 
   template <typename T>
-  DataToken<T> Output(const std::string& name) {
+  SlotHandle<T> Output(const std::string& name) {
     auto tok = RegisterSlot<T>(name);
     producers_[tok.index].insert(current_node_);
     return tok;
   }
 
   template <typename T>
-  DataToken<T> Lookup(const std::string& name) const {
+  SlotHandle<T> Lookup(const std::string& name) const {
     auto it = name_map_.find(name);
     if (it == name_map_.end()) {
       return {-1, name};
@@ -266,7 +266,7 @@ class Registry {
 
  private:
   template <typename T>
-  DataToken<T> RegisterSlot(const std::string& name) {
+  SlotHandle<T> RegisterSlot(const std::string& name) {
     if (auto it = name_map_.find(name); it != name_map_.end()) {
       if (slots_[it->second].type != std::type_index(typeid(T))) {
         throw std::runtime_error("Type conflict for data: " + name);
@@ -512,7 +512,7 @@ class GraphTemplate {
   const Registry& Reg() const { return registry_; }
 
   template <typename T>
-  DataToken<T> Token(const std::string& name) const {
+  SlotHandle<T> Token(const std::string& name) const {
     return registry_.Lookup<T>(name);
   }
 

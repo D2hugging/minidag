@@ -45,9 +45,9 @@ class QueryParseOp : public Operator {
   std::string Name() const override { return "QueryParse"; }
 
  private:
-  DataToken<UserRequest> input_;
-  DataToken<std::string> output_;
-  DataToken<std::vector<int>> blacklist_;
+  SlotHandle<UserRequest> input_;
+  SlotHandle<std::string> output_;
+  SlotHandle<std::vector<int>> blacklist_;
 };
 
 REGISTER_OP(QueryParseOp);
@@ -101,9 +101,9 @@ class VectorRecallOp : public Operator {
   std::string Name() const override { return "VectorRecall"; }
 
  private:
-  DataToken<std::string> input_;
-  DataToken<RecallResult> output_;
-  DataToken<std::vector<int>> blacklist_;
+  SlotHandle<std::string> input_;
+  SlotHandle<RecallResult> output_;
+  SlotHandle<std::vector<int>> blacklist_;
 
   // Configuration parameters
   int top_k_ = 10;
@@ -133,8 +133,8 @@ class IndexRecallOp : public Operator {
   std::string Name() const override { return "IndexRecall"; }
 
  private:
-  DataToken<std::string> input_;
-  DataToken<RecallResult> output_;
+  SlotHandle<std::string> input_;
+  SlotHandle<RecallResult> output_;
 };
 REGISTER_OP(IndexRecallOp);
 
@@ -158,8 +158,8 @@ class HotRecallOp : public Operator {
   std::string Name() const override { return "HotRecall"; }
 
  private:
-  DataToken<std::string> input_;
-  DataToken<RecallResult> output_;
+  SlotHandle<std::string> input_;
+  SlotHandle<RecallResult> output_;
 };
 
 REGISTER_OP(HotRecallOp);
@@ -206,8 +206,8 @@ class MergeOp : public Operator {
   std::string Name() const override { return "Merge"; }
 
  private:
-  DataToken<RecallResult> in_vec_, in_idx_, in_hot_;
-  DataToken<std::vector<Item>> output_;
+  SlotHandle<RecallResult> in_vec_, in_idx_, in_hot_;
+  SlotHandle<std::vector<Item>> output_;
 };
 
 REGISTER_OP(MergeOp);
@@ -237,8 +237,8 @@ class RankOp : public Operator {
   std::string Name() const override { return "Rank"; }
 
  private:
-  DataToken<std::vector<Item>> input_;
-  DataToken<RankResult> output_;
+  SlotHandle<std::vector<Item>> input_;
+  SlotHandle<RankResult> output_;
 };
 
 REGISTER_OP(RankOp);
@@ -287,8 +287,8 @@ class DeepRankOp : public Operator {
   std::string Name() const override { return "DeepRank"; }
 
  private:
-  DataToken<std::vector<Item>> input_;
-  DataToken<RankResult> output_;
+  SlotHandle<std::vector<Item>> input_;
+  SlotHandle<RankResult> output_;
 
   std::string model_path_;
   float ctr_threshold_;
@@ -328,8 +328,8 @@ class ReRankOp : public Operator {
   std::string Name() const override { return "ReRank"; }
 
  private:
-  DataToken<RankResult> input_;
-  DataToken<RankResult> output_;
+  SlotHandle<RankResult> input_;
+  SlotHandle<RankResult> output_;
   int top_n_ = 10;
 };
 
