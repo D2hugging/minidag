@@ -268,26 +268,26 @@ TEST(ThreadPool, SingleThreadSerializesExecution) {
 
 TEST(Context, SetGetRoundTripInt) {
   Registry reg;
-  auto tok = reg.Output<int>("val");
+  auto handle = reg.Output<int>("val");
   Context ctx(reg.SlotCount());
-  ctx.Set(tok, int(42));
-  EXPECT_EQ(ctx.Get(tok), 42);
+  ctx.Set(handle, int(42));
+  EXPECT_EQ(ctx.Get(handle), 42);
 }
 
 TEST(Context, SetGetRoundTripString) {
   Registry reg;
-  auto tok = reg.Output<std::string>("val");
+  auto handle = reg.Output<std::string>("val");
   Context ctx(reg.SlotCount());
-  ctx.Set(tok, std::string("hello"));
-  EXPECT_EQ(ctx.Get(tok), "hello");
+  ctx.Set(handle, std::string("hello"));
+  EXPECT_EQ(ctx.Get(handle), "hello");
 }
 
 TEST(Context, SetGetRoundTripVector) {
   Registry reg;
-  auto tok = reg.Output<std::vector<int>>("val");
+  auto handle = reg.Output<std::vector<int>>("val");
   Context ctx(reg.SlotCount());
-  ctx.Set(tok, std::vector<int>{1, 2, 3});
-  EXPECT_EQ(ctx.Get(tok), (std::vector<int>{1, 2, 3}));
+  ctx.Set(handle, std::vector<int>{1, 2, 3});
+  EXPECT_EQ(ctx.Get(handle), (std::vector<int>{1, 2, 3}));
 }
 
 struct Point {
@@ -297,10 +297,10 @@ struct Point {
 
 TEST(Context, SetGetRoundTripCustomStruct) {
   Registry reg;
-  auto tok = reg.Output<Point>("pt");
+  auto handle = reg.Output<Point>("pt");
   Context ctx(reg.SlotCount());
-  ctx.Set(tok, Point{3, 4});
-  EXPECT_EQ(ctx.Get(tok), (Point{3, 4}));
+  ctx.Set(handle, Point{3, 4});
+  EXPECT_EQ(ctx.Get(handle), (Point{3, 4}));
 }
 
 TEST(Context, GetInvalidTokenThrows) {
@@ -311,19 +311,19 @@ TEST(Context, GetInvalidTokenThrows) {
 
 TEST(Context, GetTypeMismatchThrows) {
   Registry reg;
-  auto int_tok = reg.Output<int>("val");
+  auto int_handle = reg.Output<int>("val");
   Context ctx(reg.SlotCount());
-  ctx.Set(int_tok, int(42));
-  SlotHandle<std::string> str_tok{int_tok.index, "val"};
-  EXPECT_THROW(ctx.Get(str_tok), std::runtime_error);
+  ctx.Set(int_handle, int(42));
+  SlotHandle<std::string> str_handle{int_handle.index, "val"};
+  EXPECT_THROW(ctx.Get(str_handle), std::runtime_error);
 }
 
 TEST(Context, MoveSemantics) {
   Registry reg;
-  auto tok = reg.Output<std::string>("val");
+  auto handle = reg.Output<std::string>("val");
   Context ctx(reg.SlotCount());
-  ctx.Set(tok, std::string("moveme"));
-  std::string moved = ctx.Move(tok);
+  ctx.Set(handle, std::string("moveme"));
+  std::string moved = ctx.Move(handle);
   EXPECT_EQ(moved, "moveme");
   // After std::any_cast with move, the any is in a valid-but-unspecified state.
   // The value has been extracted — a second Move or Get would fail or return
@@ -338,11 +338,11 @@ TEST(Context, MoveInvalidTokenThrows) {
 
 TEST(Context, HasReturnsFalseForUnset) {
   Registry reg;
-  auto tok = reg.Output<int>("val");
+  auto handle = reg.Output<int>("val");
   Context ctx(reg.SlotCount());
-  EXPECT_FALSE(ctx.Has(tok));
-  ctx.Set(tok, int(1));
-  EXPECT_TRUE(ctx.Has(tok));
+  EXPECT_FALSE(ctx.Has(handle));
+  ctx.Set(handle, int(1));
+  EXPECT_TRUE(ctx.Has(handle));
 }
 
 TEST(Context, HasReturnsFalseForInvalidToken) {
@@ -398,16 +398,16 @@ TEST(Registry, LookupAfterRegistration) {
   Registry reg;
   reg.SetCurrentNode(0);
   reg.Output<int>("x");
-  auto tok = reg.Lookup<int>("x");
-  EXPECT_TRUE(tok.IsValid());
-  EXPECT_EQ(tok.index, 0);
+  auto handle = reg.Lookup<int>("x");
+  EXPECT_TRUE(handle.IsValid());
+  EXPECT_EQ(handle.index, 0);
 }
 
 TEST(Registry, LookupUnregisteredReturnsInvalid) {
   Registry reg;
-  auto tok = reg.Lookup<int>("nonexistent");
-  EXPECT_FALSE(tok.IsValid());
-  EXPECT_EQ(tok.index, -1);
+  auto handle = reg.Lookup<int>("nonexistent");
+  EXPECT_FALSE(handle.IsValid());
+  EXPECT_EQ(handle.index, -1);
 }
 
 TEST(Registry, LookupTypeMismatchThrows) {
@@ -420,14 +420,14 @@ TEST(Registry, LookupTypeMismatchThrows) {
 TEST(Registry, ProducersConsumersTracking) {
   Registry reg;
   reg.SetCurrentNode(0);
-  auto tok = reg.Output<int>("x");
+  auto handle = reg.Output<int>("x");
   reg.SetCurrentNode(1);
   reg.Input<int>("x");
 
   const auto& producers = reg.Producers();
   const auto& consumers = reg.Consumers();
-  EXPECT_EQ(producers.at(tok.index).count(0), 1u);
-  EXPECT_EQ(consumers.at(tok.index).count(1), 1u);
+  EXPECT_EQ(producers.at(handle.index).count(0), 1u);
+  EXPECT_EQ(consumers.at(handle.index).count(1), 1u);
 }
 
 TEST(Registry, InputSlots) {
@@ -436,8 +436,8 @@ TEST(Registry, InputSlots) {
   reg.Input<int>("external");  // consumed but not produced
   reg.Output<int>("internal");
   auto inputs = reg.InputSlots();
-  auto ext_tok = reg.Lookup<int>("external");
-  EXPECT_EQ(inputs.count(ext_tok.index), 1u);
+  auto ext_handle = reg.Lookup<int>("external");
+  EXPECT_EQ(inputs.count(ext_handle.index), 1u);
 }
 
 TEST(Registry, OutputSlots) {
@@ -446,8 +446,8 @@ TEST(Registry, OutputSlots) {
   reg.Output<int>("orphan");  // produced but not consumed
   reg.Input<int>("external");
   auto outputs = reg.OutputSlots();
-  auto orph_tok = reg.Lookup<int>("orphan");
-  EXPECT_EQ(outputs.count(orph_tok.index), 1u);
+  auto orph_handle = reg.Lookup<int>("orphan");
+  EXPECT_EQ(outputs.count(orph_handle.index), 1u);
 }
 
 // ============================================================
@@ -672,8 +672,8 @@ TEST(GraphTemplate, TokenLookupPostBuild) {
   };
   GraphTemplate tmpl;
   tmpl.Build(configs, silent);
-  auto tok = tmpl.Token<int>("sum");
-  EXPECT_TRUE(tok.IsValid());
+  auto handle = tmpl.Handle<int>("sum");
+  EXPECT_TRUE(handle.IsValid());
 }
 
 TEST(GraphTemplate, TokenLookupUnknownReturnsInvalid) {
@@ -682,8 +682,8 @@ TEST(GraphTemplate, TokenLookupUnknownReturnsInvalid) {
   };
   GraphTemplate tmpl;
   tmpl.Build(configs, silent);
-  auto tok = tmpl.Token<int>("nonexistent");
-  EXPECT_FALSE(tok.IsValid());
+  auto handle = tmpl.Handle<int>("nonexistent");
+  EXPECT_FALSE(handle.IsValid());
 }
 
 TEST(GraphTemplate, TokenLookupTypeMismatchThrows) {
@@ -692,7 +692,7 @@ TEST(GraphTemplate, TokenLookupTypeMismatchThrows) {
   };
   GraphTemplate tmpl;
   tmpl.Build(configs, silent);
-  EXPECT_THROW(tmpl.Token<std::string>("a"), std::runtime_error);
+  EXPECT_THROW(tmpl.Handle<std::string>("a"), std::runtime_error);
 }
 
 // ============================================================
@@ -717,8 +717,8 @@ TEST_F(GraphExecutorTest, LinearDagExecutesCorrectResult) {
   auto future = exec->Run();
   future.get();
 
-  auto tok = exec->Template().Token<int>("sum");
-  EXPECT_EQ(exec->Ctx().Get(tok), 10);
+  auto handle = exec->Template().Handle<int>("sum");
+  EXPECT_EQ(exec->Ctx().Get(handle), 10);
 }
 
 TEST_F(GraphExecutorTest, DiamondDagExecutesCorrectResult) {
@@ -736,8 +736,8 @@ TEST_F(GraphExecutorTest, DiamondDagExecutesCorrectResult) {
   auto future = exec->Run();
   future.get();
 
-  auto tok = exec->Template().Token<std::string>("merged_string");
-  auto result = exec->Ctx().Get(tok);
+  auto handle = exec->Template().Handle<std::string>("merged_string");
+  auto result = exec->Ctx().Get(handle);
   // Both branches produce values; order may vary but both present
   EXPECT_TRUE(result.find("produced_value") != std::string::npos);
   EXPECT_TRUE(result.find("slow_done") != std::string::npos);
@@ -860,17 +860,17 @@ TEST_F(GraphExecutorTest, ExternalInputInjection) {
   auto tmpl = std::make_shared<GraphTemplate>();
   tmpl->Build(configs, silent);
 
-  auto input_tok = tmpl->Token<std::string>("input");
-  ASSERT_TRUE(input_tok.IsValid());
+  auto input_handle = tmpl->Handle<std::string>("input");
+  ASSERT_TRUE(input_handle.IsValid());
 
   auto exec = std::make_shared<GraphExecutor>(tmpl, pool_, silent);
-  exec->Ctx().Set(input_tok, std::string("injected"));
+  exec->Ctx().Set(input_handle, std::string("injected"));
 
   auto future = exec->Run();
   future.get();
 
-  auto output_tok = tmpl->Token<std::string>("output");
-  EXPECT_EQ(exec->Ctx().Get(output_tok), "injected");
+  auto output_handle = tmpl->Handle<std::string>("output");
+  EXPECT_EQ(exec->Ctx().Get(output_handle), "injected");
 }
 
 // ============================================================
@@ -935,7 +935,7 @@ TEST(DagManager, ReplaceDagSwapsTemplate) {
 
   auto exec1 = mgr.CreateExecutor("math");
   exec1->Run().get();
-  EXPECT_EQ(exec1->Ctx().Get(exec1->Template().Token<int>("sum")), 3);
+  EXPECT_EQ(exec1->Ctx().Get(exec1->Template().Handle<int>("sum")), 3);
 
   // Replace: produces a=10, b=20 -> sum=30
   std::vector<NodeConfig> v2 = {
@@ -948,7 +948,7 @@ TEST(DagManager, ReplaceDagSwapsTemplate) {
 
   auto exec2 = mgr.CreateExecutor("math");
   exec2->Run().get();
-  EXPECT_EQ(exec2->Ctx().Get(exec2->Template().Token<int>("sum")), 30);
+  EXPECT_EQ(exec2->Ctx().Get(exec2->Template().Handle<int>("sum")), 30);
 }
 
 TEST(DagManager, ReplaceDagUnknownNameThrows) {
@@ -983,12 +983,12 @@ TEST(DagManager, HotReloadOldExecutorKeepsOldTemplate) {
 
   // Old executor still runs with old template
   old_exec->Run().get();
-  EXPECT_EQ(old_exec->Ctx().Get(old_exec->Template().Token<int>("sum")), 10);
+  EXPECT_EQ(old_exec->Ctx().Get(old_exec->Template().Handle<int>("sum")), 10);
 
   // New executor gets new result
   auto new_exec = mgr.CreateExecutor("hr");
   new_exec->Run().get();
-  EXPECT_EQ(new_exec->Ctx().Get(new_exec->Template().Token<int>("sum")), 300);
+  EXPECT_EQ(new_exec->Ctx().Get(new_exec->Template().Handle<int>("sum")), 300);
 }
 
 // ============================================================
@@ -1010,8 +1010,8 @@ TEST(Integration, MultiOperatorPipelineEndToEnd) {
   auto future = exec->Run();
   future.get();
 
-  auto tok = exec->Template().Token<std::string>("merged_string");
-  auto result = exec->Ctx().Get(tok);
+  auto handle = exec->Template().Handle<std::string>("merged_string");
+  auto result = exec->Ctx().Get(handle);
   EXPECT_FALSE(result.empty());
   EXPECT_TRUE(result.find("produced_value") != std::string::npos);
   EXPECT_TRUE(result.find("slow_done") != std::string::npos);
@@ -1046,8 +1046,8 @@ TEST(Integration, MultipleDAGsInSameDagManager) {
   f1.get();
   f2.get();
 
-  EXPECT_EQ(e1->Ctx().Get(e1->Template().Token<int>("sum")), 5);
-  EXPECT_EQ(e2->Ctx().Get(e2->Template().Token<int>("sum")), 300);
+  EXPECT_EQ(e1->Ctx().Get(e1->Template().Handle<int>("sum")), 5);
+  EXPECT_EQ(e2->Ctx().Get(e2->Template().Handle<int>("sum")), 300);
 }
 
 // ============================================================
@@ -1071,8 +1071,8 @@ TEST(ConcurrencyStress, ConcurrentExecutions) {
       auto exec = mgr.CreateExecutor("stress");
       auto future = exec->Run();
       future.get();
-      auto tok = exec->Template().Token<int>("sum");
-      if (exec->Ctx().Get(tok) == 10) {
+      auto handle = exec->Template().Handle<int>("sum");
+      if (exec->Ctx().Get(handle) == 10) {
         success.fetch_add(1);
       }
     });
@@ -1103,8 +1103,8 @@ TEST(ConcurrencyStress, ConcurrentCreateAndReplace) {
           auto exec = mgr.CreateExecutor("live");
           auto future = exec->Run();
           future.get();
-          auto tok = exec->Template().Token<int>("sum");
-          int val = exec->Ctx().Get(tok);
+          auto handle = exec->Template().Handle<int>("sum");
+          int val = exec->Ctx().Get(handle);
           // Value should be either 2 (original) or 1000 (replaced)
           if (val == 2 || val == 1000) {
             reads_ok.fetch_add(1);

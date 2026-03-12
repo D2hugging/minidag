@@ -113,10 +113,10 @@ class ThreadPool {
 };
 
 // ==========================================
-// 2. Type System: Token & Context
+// 2. Type System: SlotHandle & Context
 // ==========================================
 
-// Strongly-typed token; avoids raw string/int keys
+// Strongly-typed handle; avoids raw string/int keys
 template <typename T>
 struct SlotHandle {
   int index = -1;
@@ -136,40 +136,40 @@ class Context {
 
   // Write data (wait-free)
   template <typename T>
-  void Set(const SlotHandle<T>& token, T&& value) {
-    if (!token.IsValid()) return;
-    data_[token.index].value = std::forward<T>(value);
+  void Set(const SlotHandle<T>& handle, T&& value) {
+    if (!handle.IsValid()) return;
+    data_[handle.index].value = std::forward<T>(value);
   }
 
   // Read data (wait-free, immutable)
   template <typename T>
-  const T& Get(const SlotHandle<T>& token) const {
-    if (!token.IsValid()) {
-      throw std::runtime_error("Invalid token access: " + token.name);
+  const T& Get(const SlotHandle<T>& handle) const {
+    if (!handle.IsValid()) {
+      throw std::runtime_error("Invalid handle access: " + handle.name);
     }
 
     try {
-      return std::any_cast<const T&>(data_[token.index].value);
+      return std::any_cast<const T&>(data_[handle.index].value);
     } catch (const std::bad_any_cast&) {
-      throw std::runtime_error("Type mismatch reading data: " + token.name);
+      throw std::runtime_error("Type mismatch reading data: " + handle.name);
     }
   }
 
   // Move-extract data (transfer ownership to the next stage or final output)
   template <typename T>
-  T Move(const SlotHandle<T>& token) {
-    if (!token.IsValid()) {
-      throw std::runtime_error("Invalid token move");
+  T Move(const SlotHandle<T>& handle) {
+    if (!handle.IsValid()) {
+      throw std::runtime_error("Invalid handle move");
     }
 
-    return std::any_cast<T>(std::move(data_[token.index].value));
+    return std::any_cast<T>(std::move(data_[handle.index].value));
   }
 
   // Check whether a slot has been populated (safe for optional inputs)
   template <typename T>
-  bool Has(const SlotHandle<T>& token) const {
-    if (!token.IsValid()) return false;
-    return data_[token.index].value.has_value();
+  bool Has(const SlotHandle<T>& handle) const {
+    if (!handle.IsValid()) return false;
+    return data_[handle.index].value.has_value();
   }
 
   // Cancellation
@@ -512,7 +512,7 @@ class GraphTemplate {
   const Registry& Reg() const { return registry_; }
 
   template <typename T>
-  SlotHandle<T> Token(const std::string& name) const {
+  SlotHandle<T> Handle(const std::string& name) const {
     return registry_.Lookup<T>(name);
   }
 
