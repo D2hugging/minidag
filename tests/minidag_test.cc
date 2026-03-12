@@ -268,7 +268,7 @@ TEST(ThreadPool, SingleThreadSerializesExecution) {
 
 TEST(Context, SetGetRoundTripInt) {
   Registry reg;
-  auto handle =reg.Output<int>("val");
+  auto handle = reg.Output<int>("val");
   Context ctx(reg.SlotCount());
   ctx.Set(handle, int(42));
   EXPECT_EQ(ctx.Get(handle), 42);
@@ -276,7 +276,7 @@ TEST(Context, SetGetRoundTripInt) {
 
 TEST(Context, SetGetRoundTripString) {
   Registry reg;
-  auto handle =reg.Output<std::string>("val");
+  auto handle = reg.Output<std::string>("val");
   Context ctx(reg.SlotCount());
   ctx.Set(handle, std::string("hello"));
   EXPECT_EQ(ctx.Get(handle), "hello");
@@ -284,7 +284,7 @@ TEST(Context, SetGetRoundTripString) {
 
 TEST(Context, SetGetRoundTripVector) {
   Registry reg;
-  auto handle =reg.Output<std::vector<int>>("val");
+  auto handle = reg.Output<std::vector<int>>("val");
   Context ctx(reg.SlotCount());
   ctx.Set(handle, std::vector<int>{1, 2, 3});
   EXPECT_EQ(ctx.Get(handle), (std::vector<int>{1, 2, 3}));
@@ -297,7 +297,7 @@ struct Point {
 
 TEST(Context, SetGetRoundTripCustomStruct) {
   Registry reg;
-  auto handle =reg.Output<Point>("pt");
+  auto handle = reg.Output<Point>("pt");
   Context ctx(reg.SlotCount());
   ctx.Set(handle, Point{3, 4});
   EXPECT_EQ(ctx.Get(handle), (Point{3, 4}));
@@ -320,7 +320,7 @@ TEST(Context, GetTypeMismatchThrows) {
 
 TEST(Context, MoveSemantics) {
   Registry reg;
-  auto handle =reg.Output<std::string>("val");
+  auto handle = reg.Output<std::string>("val");
   Context ctx(reg.SlotCount());
   ctx.Set(handle, std::string("moveme"));
   std::string moved = ctx.Move(handle);
@@ -338,7 +338,7 @@ TEST(Context, MoveInvalidTokenThrows) {
 
 TEST(Context, HasReturnsFalseForUnset) {
   Registry reg;
-  auto handle =reg.Output<int>("val");
+  auto handle = reg.Output<int>("val");
   Context ctx(reg.SlotCount());
   EXPECT_FALSE(ctx.Has(handle));
   ctx.Set(handle, int(1));
@@ -398,14 +398,14 @@ TEST(Registry, LookupAfterRegistration) {
   Registry reg;
   reg.SetCurrentNode(0);
   reg.Output<int>("x");
-  auto handle =reg.Lookup<int>("x");
+  auto handle = reg.Lookup<int>("x");
   EXPECT_TRUE(handle.IsValid());
   EXPECT_EQ(handle.index, 0);
 }
 
 TEST(Registry, LookupUnregisteredReturnsInvalid) {
   Registry reg;
-  auto handle =reg.Lookup<int>("nonexistent");
+  auto handle = reg.Lookup<int>("nonexistent");
   EXPECT_FALSE(handle.IsValid());
   EXPECT_EQ(handle.index, -1);
 }
@@ -420,7 +420,7 @@ TEST(Registry, LookupTypeMismatchThrows) {
 TEST(Registry, ProducersConsumersTracking) {
   Registry reg;
   reg.SetCurrentNode(0);
-  auto handle =reg.Output<int>("x");
+  auto handle = reg.Output<int>("x");
   reg.SetCurrentNode(1);
   reg.Input<int>("x");
 
@@ -672,7 +672,7 @@ TEST(GraphTemplate, TokenLookupPostBuild) {
   };
   GraphTemplate tmpl;
   tmpl.Build(configs, silent);
-  auto handle =tmpl.Handle<int>("sum");
+  auto handle = tmpl.Handle<int>("sum");
   EXPECT_TRUE(handle.IsValid());
 }
 
@@ -682,7 +682,7 @@ TEST(GraphTemplate, TokenLookupUnknownReturnsInvalid) {
   };
   GraphTemplate tmpl;
   tmpl.Build(configs, silent);
-  auto handle =tmpl.Handle<int>("nonexistent");
+  auto handle = tmpl.Handle<int>("nonexistent");
   EXPECT_FALSE(handle.IsValid());
 }
 
@@ -717,7 +717,7 @@ TEST_F(GraphExecutorTest, LinearDagExecutesCorrectResult) {
   auto future = exec->Run();
   future.get();
 
-  auto handle =exec->Template().Handle<int>("sum");
+  auto handle = exec->Template().Handle<int>("sum");
   EXPECT_EQ(exec->Ctx().Get(handle), 10);
 }
 
@@ -736,7 +736,7 @@ TEST_F(GraphExecutorTest, DiamondDagExecutesCorrectResult) {
   auto future = exec->Run();
   future.get();
 
-  auto handle =exec->Template().Handle<std::string>("merged_string");
+  auto handle = exec->Template().Handle<std::string>("merged_string");
   auto result = exec->Ctx().Get(handle);
   // Both branches produce values; order may vary but both present
   EXPECT_TRUE(result.find("produced_value") != std::string::npos);
@@ -1010,7 +1010,7 @@ TEST(Integration, MultiOperatorPipelineEndToEnd) {
   auto future = exec->Run();
   future.get();
 
-  auto handle =exec->Template().Handle<std::string>("merged_string");
+  auto handle = exec->Template().Handle<std::string>("merged_string");
   auto result = exec->Ctx().Get(handle);
   EXPECT_FALSE(result.empty());
   EXPECT_TRUE(result.find("produced_value") != std::string::npos);
@@ -1071,7 +1071,7 @@ TEST(ConcurrencyStress, ConcurrentExecutions) {
       auto exec = mgr.CreateExecutor("stress");
       auto future = exec->Run();
       future.get();
-      auto handle =exec->Template().Handle<int>("sum");
+      auto handle = exec->Template().Handle<int>("sum");
       if (exec->Ctx().Get(handle) == 10) {
         success.fetch_add(1);
       }
@@ -1103,7 +1103,7 @@ TEST(ConcurrencyStress, ConcurrentCreateAndReplace) {
           auto exec = mgr.CreateExecutor("live");
           auto future = exec->Run();
           future.get();
-          auto handle =exec->Template().Handle<int>("sum");
+          auto handle = exec->Template().Handle<int>("sum");
           int val = exec->Ctx().Get(handle);
           // Value should be either 2 (original) or 1000 (replaced)
           if (val == 2 || val == 1000) {
