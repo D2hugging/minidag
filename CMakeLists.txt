@@ -8,7 +8,11 @@ include_directories(include)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -pthread -march=native")
+option(MINIDAG_NATIVE_ARCH "Use -march=native" OFF)
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -pthread")
+if(MINIDAG_NATIVE_ARCH)
+  string(APPEND CMAKE_CXX_FLAGS_RELEASE " -march=native")
+endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -pthread -Wall -Wextra")
 
 include(FetchContent)
