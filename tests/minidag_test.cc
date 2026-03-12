@@ -33,8 +33,8 @@ class AddOp : public Operator {
   std::string Name() const override { return "AddOp"; }
 
  private:
-  DataToken<int> a_, b_;
-  DataToken<int> sum_;
+  SlotHandle<int> a_, b_;
+  SlotHandle<int> sum_;
 };
 REGISTER_OP(AddOp);
 
@@ -51,7 +51,7 @@ class PassthroughOp : public Operator {
   std::string Name() const override { return "PassthroughOp"; }
 
  private:
-  DataToken<std::string> input_, output_;
+  SlotHandle<std::string> input_, output_;
 };
 REGISTER_OP(PassthroughOp);
 
@@ -67,7 +67,7 @@ class FailOp : public Operator {
   std::string Name() const override { return "FailOp"; }
 
  private:
-  DataToken<std::string> input_;
+  SlotHandle<std::string> input_;
 };
 REGISTER_OP(FailOp);
 
@@ -88,7 +88,7 @@ class SlowOp : public Operator {
   std::string Name() const override { return "SlowOp"; }
 
  private:
-  DataToken<std::string> input_, output_;
+  SlotHandle<std::string> input_, output_;
   int sleep_ms_ = 50;
 };
 REGISTER_OP(SlowOp);
@@ -107,7 +107,7 @@ class ConfigEchoOp : public Operator {
   const std::string& GetEchoVal() const { return echo_val_; }
 
  private:
-  DataToken<std::string> output_;
+  SlotHandle<std::string> output_;
   std::string echo_val_;
 };
 REGISTER_OP(ConfigEchoOp);
@@ -123,7 +123,7 @@ class ProducerOp : public Operator {
   std::string Name() const override { return "ProducerOp"; }
 
  private:
-  DataToken<std::string> output_;
+  SlotHandle<std::string> output_;
 };
 REGISTER_OP(ProducerOp);
 
@@ -144,7 +144,7 @@ class IntProducerOp : public Operator {
   std::string Name() const override { return "IntProducerOp"; }
 
  private:
-  DataToken<int> a_, b_;
+  SlotHandle<int> a_, b_;
   int a_val_ = 1, b_val_ = 2;
 };
 REGISTER_OP(IntProducerOp);
@@ -168,7 +168,7 @@ class CancelAwareOp : public Operator {
   std::string Name() const override { return "CancelAwareOp"; }
 
  private:
-  DataToken<std::string> input_, output_;
+  SlotHandle<std::string> input_, output_;
 };
 REGISTER_OP(CancelAwareOp);
 
@@ -191,7 +191,7 @@ class StringSinkOp : public Operator {
   std::string Name() const override { return "StringSinkOp"; }
 
  private:
-  DataToken<std::string> in1_, in2_, merged_;
+  SlotHandle<std::string> in1_, in2_, merged_;
 };
 REGISTER_OP(StringSinkOp);
 
@@ -305,7 +305,7 @@ TEST(Context, SetGetRoundTripCustomStruct) {
 
 TEST(Context, GetInvalidTokenThrows) {
   Context ctx(1);
-  DataToken<int> bad{-1, "bad"};
+  SlotHandle<int> bad{-1, "bad"};
   EXPECT_THROW(ctx.Get(bad), std::runtime_error);
 }
 
@@ -314,7 +314,7 @@ TEST(Context, GetTypeMismatchThrows) {
   auto int_tok = reg.Output<int>("val");
   Context ctx(reg.SlotCount());
   ctx.Set(int_tok, int(42));
-  DataToken<std::string> str_tok{int_tok.index, "val"};
+  SlotHandle<std::string> str_tok{int_tok.index, "val"};
   EXPECT_THROW(ctx.Get(str_tok), std::runtime_error);
 }
 
@@ -332,7 +332,7 @@ TEST(Context, MoveSemantics) {
 
 TEST(Context, MoveInvalidTokenThrows) {
   Context ctx(1);
-  DataToken<int> bad{-1, "bad"};
+  SlotHandle<int> bad{-1, "bad"};
   EXPECT_THROW(ctx.Move(bad), std::runtime_error);
 }
 
@@ -347,7 +347,7 @@ TEST(Context, HasReturnsFalseForUnset) {
 
 TEST(Context, HasReturnsFalseForInvalidToken) {
   Context ctx(1);
-  DataToken<int> bad{-1, "bad"};
+  SlotHandle<int> bad{-1, "bad"};
   EXPECT_FALSE(ctx.Has(bad));
 }
 
