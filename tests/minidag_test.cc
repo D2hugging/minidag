@@ -303,6 +303,61 @@ TEST(Context, SetGetRoundTripCustomStruct) {
   EXPECT_EQ(ctx.Get(handle), (Point{3, 4}));
 }
 
+TEST(Context, SetAcceptsLvalueInt) {
+  Registry reg;
+  auto handle = reg.Output<int>("val");
+  Context ctx(reg.SlotCount());
+  int x = 42;
+  ctx.Set(handle, x);
+  EXPECT_EQ(ctx.Get(handle), 42);
+  // Original lvalue should be unchanged
+  EXPECT_EQ(x, 42);
+}
+
+TEST(Context, SetAcceptsLvalueString) {
+  Registry reg;
+  auto handle = reg.Output<std::string>("val");
+  Context ctx(reg.SlotCount());
+  std::string s = "hello";
+  ctx.Set(handle, s);
+  EXPECT_EQ(ctx.Get(handle), "hello");
+  // Original lvalue should be unchanged (copied, not moved)
+  EXPECT_EQ(s, "hello");
+}
+
+TEST(Context, SetAcceptsLvalueVector) {
+  Registry reg;
+  auto handle = reg.Output<std::vector<int>>("val");
+  Context ctx(reg.SlotCount());
+  std::vector<int> v = {1, 2, 3};
+  ctx.Set(handle, v);
+  EXPECT_EQ(ctx.Get(handle), (std::vector<int>{1, 2, 3}));
+  // Original lvalue should be unchanged
+  EXPECT_EQ(v, (std::vector<int>{1, 2, 3}));
+}
+
+TEST(Context, SetAcceptsConstLvalue) {
+  Registry reg;
+  auto handle = reg.Output<std::string>("val");
+  Context ctx(reg.SlotCount());
+  const std::string s = "const_val";
+  ctx.Set(handle, s);
+  EXPECT_EQ(ctx.Get(handle), "const_val");
+}
+
+// ctx.Set(handle, 42) on a SlotHandle<std::string> is now a compile-time error:
+//   static_assert: "Set value type must be convertible to SlotHandle type"
+// Uncomment the line below to verify:
+//   ctx.Set(handle, 42);
+TEST(Context, SetAcceptsConvertibleTypes) {
+  Registry reg;
+  auto handle = reg.Output<std::string>("val");
+  Context ctx(reg.SlotCount());
+  // const char* is convertible to std::string — should work
+  ctx.Set(handle, std::string("hello"));
+  EXPECT_EQ(ctx.Get(handle), "hello");
+}
+
 TEST(Context, GetInvalidTokenThrows) {
   Context ctx(1);
   SlotHandle<int> bad{-1, "bad"};

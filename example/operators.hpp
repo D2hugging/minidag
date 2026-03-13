@@ -38,8 +38,8 @@ class QueryParseOp : public Operator {
     ctx.Set(blacklist_, std::vector<int>{104, 105});  // example blacklist
 
     std::cout << "[" << Name() << "]User: " << req.uid
-              << ", Query: " << req.query
-              << ", Parsed: " << ctx.Get<std::string>(output_) << '\n';
+              << ", Query: " << req.query << ", Parsed: " << ctx.Get(output_)
+              << '\n';
   }
 
   std::string Name() const override { return "QueryParse"; }
@@ -232,7 +232,7 @@ class RankOp : public Operator {
     RankResult res;
     res.final_items = items;
     ctx.Set(output_, std::move(res));
-    printf("[Rank] Ranking finished. Top1 ID: %d\n", items[0].id);
+    std::cout << "[Rank] Ranking finished. Top1 ID: " << items[0].id << '\n';
   }
   std::string Name() const override { return "Rank"; }
 
@@ -282,7 +282,8 @@ class DeepRankOp : public Operator {
     RankResult res;
     res.final_items = items;
     ctx.Set(output_, std::move(res));
-    printf("[DeepRank] Ranking finished. Top1 ID: %d\n", items[0].id);
+    std::cout << "[DeepRank] Ranking finished. Top1 ID: " << items[0].id
+              << '\n';
   }
   std::string Name() const override { return "DeepRank"; }
 
@@ -321,7 +322,7 @@ class ReRankOp : public Operator {
     if (static_cast<int>(ranked.final_items.size()) > top_n_) {
       ranked.final_items.resize(top_n_);
     }
-    printf("[ReRank] Reranked to top %d items\n", top_n_);
+    std::cout << "[ReRank] Reranked to top " << top_n_ << " items\n";
     ctx.Set(output_, std::move(ranked));
   }
 

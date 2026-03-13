@@ -2,7 +2,6 @@
 
 #include <any>
 #include <atomic>
-#include <cassert>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -18,7 +17,6 @@
 #include <string>
 #include <thread>
 #include <typeindex>
-#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -37,7 +35,7 @@ inline LogFn StderrLogger(LogLevel min = LogLevel::kInfo) {
   return [min](LogLevel level, const std::string& msg) {
     if (level < min) return;
     static const char* tags[] = {"DEBUG", "INFO", "WARN", "ERROR"};
-    std::cerr << "[" << tags[static_cast<int>(level)] << "] " << msg << "\n";
+    std::cerr << "[" << tags[static_cast<int>(level)] << "] " << msg << '\n';
   };
 }
 
@@ -109,7 +107,7 @@ class ThreadPool {
   std::queue<std::function<void()>> tasks_;
   std::mutex queue_mutex_;
   std::condition_variable condition_;
-  std::atomic<bool> stop_;
+  bool stop_;
 };
 
 // ==========================================
@@ -134,14 +132,14 @@ class Context {
  public:
   explicit Context(size_t size) : data_(size) {}
 
-  // Write data (wait-free)
+  // Write data — by-value sink: caller decides copy or move, we always move in
   template <typename T>
-  void Set(const SlotHandle<T>& handle, T&& value) {
+  void Set(const SlotHandle<T>& handle, T value) {
     if (!handle.IsValid()) return;
-    data_[handle.index].value = std::forward<T>(value);
+    data_[handle.index].value = std::move(value);
   }
 
-  // Read data (wait-free, immutable)
+  // Read data — returns const ref, no copy
   template <typename T>
   const T& Get(const SlotHandle<T>& handle) const {
     if (!handle.IsValid()) {
@@ -155,7 +153,8 @@ class Context {
     }
   }
 
-  // Move-extract data (transfer ownership to the next stage or final output)
+  // Move-extract data — transfers ownership out of the slot (slot becomes
+  // empty)
   template <typename T>
   T Move(const SlotHandle<T>& handle) {
     if (!handle.IsValid()) {
@@ -165,14 +164,14 @@ class Context {
     return std::any_cast<T>(std::move(data_[handle.index].value));
   }
 
-  // Check whether a slot has been populated (safe for optional inputs)
+  // Check whether a slot has been written to (safe for optional upstream nodes)
   template <typename T>
   bool Has(const SlotHandle<T>& handle) const {
     if (!handle.IsValid()) return false;
     return data_[handle.index].value.has_value();
   }
 
-  // Cancellation
+  // Cooperative cancellation — operators poll IsCancelled() for early exit
   void SetCancelFlag(std::atomic<bool>* flag) { cancel_ = flag; }
   bool IsCancelled() const {
     return cancel_ && cancel_->load(std::memory_order_acquire);
@@ -199,16 +198,16 @@ class Registry {
 
   template <typename T>
   SlotHandle<T> Input(const std::string& name) {
-    auto tok = RegisterSlot<T>(name);
-    consumers_[tok.index].insert(current_node_);
-    return tok;
+    auto slot = RegisterSlot<T>(name);
+    consumers_[slot.index].insert(current_node_);
+    return slot;
   }
 
   template <typename T>
   SlotHandle<T> Output(const std::string& name) {
-    auto tok = RegisterSlot<T>(name);
-    producers_[tok.index].insert(current_node_);
-    return tok;
+    auto slot = RegisterSlot<T>(name);
+    producers_[slot.index].insert(current_node_);
+    return slot;
   }
 
   template <typename T>
@@ -256,7 +255,7 @@ class Registry {
       if (log)
         log(LogLevel::kDebug, msg);
       else
-        std::cout << msg << "\n";
+        std::cout << msg << '\n';
     };
     emit("[Registry] Total Slots: " + std::to_string(slots_.size()));
     for (const auto& s : slots_)
@@ -286,17 +285,18 @@ class Registry {
   std::unordered_map<int, std::unordered_set<int>> consumers_;  // slot → nodes
 };
 
-// Operator interface
+// Operator interface — lifecycle: Configure → Init → Run (per request)
 class Operator {
  public:
   virtual ~Operator() = default;
-  virtual void Configure(const ConfigNode& config) {}  // optional configuration
-  virtual void Init(Registry& reg) = 0;  // build phase: declare data deps
-  virtual void Run(Context& ctx) = 0;    // runtime: pure computation
+  virtual void Configure(const ConfigNode& config) {
+  }  // parse params from config
+  virtual void Init(Registry& reg) = 0;  // declare input/output slots
+  virtual void Run(Context& ctx) = 0;    // execute (called on thread pool)
   virtual std::string Name() const = 0;
 };
 
-// Operator factory
+// Operator factory — maps op_type strings to constructors via REGISTER_OP macro
 using OpCreator = std::function<std::shared_ptr<Operator>()>;
 
 class OpFactory {
@@ -449,7 +449,7 @@ struct NodeConfig {
   int timeout_ms = 0;     // 0 = no timeout check
 };
 
-// Immutable graph template (read-only, reusable across requests)
+// Immutable graph template — built once, shared across requests (thread-safe)
 class GraphTemplate {
  public:
   struct NodeDef {
@@ -465,11 +465,12 @@ class GraphTemplate {
 
   void Build(const std::vector<NodeConfig>& configs, LogFn log = {}) {
     log_ = log;
+    nodes_.clear();
     nodes_.resize(configs.size());
     std::unordered_map<std::string, int> id_map;
     registry_ = Registry{};
 
-    // Pass 1: Instantiate & Init
+    // Pass 1: Instantiate operators, run Configure + Init to populate registry
     for (size_t i = 0; i < configs.size(); ++i) {
       id_map[configs[i].id] = i;
       nodes_[i].id = i;
@@ -482,7 +483,7 @@ class GraphTemplate {
       nodes_[i].op->Init(registry_);
     }
 
-    // Pass 2: Topology
+    // Pass 2: Wire dependency edges and compute indegrees
     for (size_t i = 0; i < configs.size(); ++i) {
       for (const auto& dep : configs[i].dependencies) {
         auto it = id_map.find(dep);
@@ -496,7 +497,7 @@ class GraphTemplate {
       }
     }
 
-    // Pass 3: Validation
+    // Pass 3: Validate DAG (cycle detection + data-flow reachability)
     ValidateCycle();
     ValidateDataFlow();
 
@@ -526,7 +527,7 @@ class GraphTemplate {
     if (log_)
       log_(level, msg);
     else
-      std::cout << msg << "\n";
+      std::cout << msg << '\n';
   }
 
   // Kahn's algorithm cycle detection
@@ -565,10 +566,10 @@ class GraphTemplate {
   // graph inputs (externally injected)
   void ValidateDataFlow() const {
     const auto& producers = registry_.Producers();
+    const auto& consumers = registry_.Consumers();
     auto graph_inputs = registry_.InputSlots();
 
     for (size_t i = 0; i < nodes_.size(); ++i) {
-      const auto& consumers = registry_.Consumers();
       // Find all slots this node consumes
       for (const auto& [slot, node_set] : consumers) {
         if (node_set.find(static_cast<int>(i)) == node_set.end()) continue;
@@ -616,7 +617,7 @@ class GraphTemplate {
   }
 };
 
-// Per-request executor
+// Per-request executor — owns a fresh Context and atomic indegree counters
 class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
  public:
   GraphExecutor(std::shared_ptr<const GraphTemplate> tmpl, ThreadPool& pool,
@@ -688,19 +689,21 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
     }
   }
 
-  void DrainChildren(int node_id) {
+  // Recursively decrement indegrees of descendants without executing them.
+  // Called on cancellation/failure to ensure remaining_tasks_ reaches zero.
+  void PropagateFailure(int node_id) {
     for (int child_id : tmpl_->Nodes()[node_id].children) {
       if (indegrees_[child_id].fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        // This child is now runnable but cancelled — drain it too
         if (remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
           TrySetValue();
           return;
         }
-        DrainChildren(child_id);
+        PropagateFailure(child_id);
       }
     }
   }
 
+  // Decrement children's indegrees; schedule any child whose indegree hits zero
   void PropagateSuccess(int node_id) {
     for (int child_id : tmpl_->Nodes()[node_id].children) {
       if (indegrees_[child_id].fetch_sub(1, std::memory_order_acq_rel) == 1) {
@@ -717,7 +720,7 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
     pool_.Enqueue([self, node_id] {
       // Check cancellation before running
       if (self->cancelled_.load(std::memory_order_acquire)) {
-        self->DrainChildren(node_id);
+        self->PropagateFailure(node_id);
         if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
             1) {
           self->TrySetValue();
@@ -747,10 +750,8 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
           self->cancelled_.store(true, std::memory_order_release);
           self->LogMsg(LogLevel::kError, "[Executor] Exception in node: " +
                                              node.name + " — " + e.what());
-          self->DrainChildren(node_id);
-          if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
-              1) {
-          }
+          self->PropagateFailure(node_id);
+          self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel);
           self->TrySetException(std::current_exception());
         }
         return;
@@ -758,10 +759,8 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
         self->cancelled_.store(true, std::memory_order_release);
         self->LogMsg(LogLevel::kError,
                      "[Executor] Exception in node: " + node.name);
-        self->DrainChildren(node_id);
-        if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
-            1) {
-        }
+        self->PropagateFailure(node_id);
+        self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel);
         self->TrySetException(std::current_exception());
         return;
       }
@@ -775,7 +774,9 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
                        std::to_string(self->metrics_[node_id].duration_us) +
                        "us)");
 
-      // Post-hoc timeout check
+      // Post-hoc timeout check — node already ran; data is in Context.
+      // This only flags the metric and cancels if required, it does not
+      // preempt execution.
       if (node.timeout_ms > 0 &&
           self->metrics_[node_id].duration_us >
               static_cast<int64_t>(node.timeout_ms) * 1000) {
@@ -789,10 +790,8 @@ class GraphExecutor : public std::enable_shared_from_this<GraphExecutor> {
           self->cancelled_.store(true, std::memory_order_release);
           self->LogMsg(LogLevel::kError,
                        "[Executor] Required node timed out: " + node.name);
-          self->DrainChildren(node_id);
-          if (self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel) ==
-              1) {
-          }
+          self->PropagateFailure(node_id);
+          self->remaining_tasks_.fetch_sub(1, std::memory_order_acq_rel);
           self->TrySetException(std::make_exception_ptr(
               std::runtime_error("timeout: " + node.name)));
           return;
