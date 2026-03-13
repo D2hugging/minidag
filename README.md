@@ -107,6 +107,8 @@ Graph topology is fully data-driven. Each DAG defines its nodes, dependencies, a
           "timeout_ms": 200,
           "params": { "top_k": 20, "model_name": "advanced_vec_model" }
         },
+        { "id": "idx_node", "op_type": "IndexRecallOp", "dependencies": ["parse_node"], "optional": true },
+        { "id": "hot_node", "op_type": "HotRecallOp", "dependencies": ["parse_node"], "optional": true },
         {
           "id": "merge_node",
           "op_type": "MergeOp",
@@ -174,7 +176,7 @@ for (const auto& m : executor->Metrics()) {
   std::cout << m.name << ": " << m.duration_us << "us";
   if (m.skipped)   std::cout << " [SKIPPED]";
   if (m.timed_out) std::cout << " [TIMED_OUT]";
-  std::cout << "\n";
+  std::cout << '\n';
 }
 ```
 
@@ -206,7 +208,7 @@ minidag/
 | CMake Option | Default | Description |
 |-------------|---------|-------------|
 | `MINIDAG_BUILD_TESTS` | `ON` | Build unit tests (`minidag_test`) |
-| `CMAKE_BUILD_TYPE` | -- | `Debug` (with sanitizers) or `Release` (with `-O2`) |
+| `CMAKE_BUILD_TYPE` | -- | `Debug` (with `-Wall -Wextra`) or `Release` (with `-O2`) |
 
 To disable tests:
 
